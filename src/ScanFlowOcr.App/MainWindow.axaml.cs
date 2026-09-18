@@ -9,6 +9,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -16,6 +17,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using ScanFlowOcr.App.Configuration;
+using ScanFlowOcr.App.Capture;
 using ScanFlowOcr.App.Models;
 using ScanFlowOcr.App.Rendering;
 using ScanFlowOcr.Capture.FlashCap;
@@ -35,11 +37,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     private readonly ISettingsManager _settingsManager;
     private readonly OutputCoordinator _coordinator;
     private readonly SimdPaddleOcrFactory _ocrFactory = new();
-    private readonly FlashCapProvider _cameraProvider = new();
+    private readonly ImagePlaylistCameraProvider _cameraProvider = new(new FlashCapProvider());
     private readonly PreviewBitmapRenderer _sessionPreviewRenderer = new();
     private readonly ObservableCollection<ScanResultItem> _allResults = [];
     private readonly ObservableCollection<ScanResultItem> _filteredResults = [];
     private readonly ObservableCollection<PlaylistThumbnailItem> _playlist = [];
+    private Bitmap? _stillPreviewBitmap;
 
     private AppSettings _settings;
     private ImmutableArray<CameraDescriptor> _cameras = [];
@@ -66,6 +69,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private long _metricLastCount;
     private long _metricLastTicks;
     private double _metricFps;
+    private int _modeRequestRevision;
 
     private enum RoiDragMode { None, Create, Move, NorthWest, NorthEast, SouthWest, SouthEast }
 
@@ -90,6 +94,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
         ResultsList.ItemsSource = _filteredResults;
         PlaylistItems.ItemsSource = _playlist;
+        _cameraProvider.ActiveImageChanged += OnActiveImageChanged;
 
         SyncToolbarFromSettings();
         UpdateZoomLevelText();
@@ -117,6 +122,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void RefreshSessionMetrics()
     {
+        RefreshOutputQueueStatus();
         if (_activeSession is not null)
         {
             var snap = _activeSession.GetSnapshot();
@@ -241,6 +247,9 @@ public partial class MainWindow : Window, IAsyncDisposable
             _ocrReader = null;
         }
         _sessionPreviewRenderer.Dispose();
+        _stillPreviewBitmap?.Dispose();
+        foreach (var item in _playlist) item.Thumbnail?.Dispose();
+        _cameraProvider.ActiveImageChanged -= OnActiveImageChanged;
         await _coordinator.DisposeAsync().ConfigureAwait(false);
         _settingsManager.Dispose();
     }
@@ -322,7 +331,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void OnOpenImages(object? sender, RoutedEventArgs e)
     {
-        if (_busy || _activeSession is not null) return;
+        if (_busy || _activeSession is not null || _preview is not null) return;
         try
         {
             var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -333,14 +342,55 @@ public partial class MainWindow : Window, IAsyncDisposable
                 [
                     new FilePickerFileType("Images")
                     {
-                        Patterns = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
+                        Patterns = ["*.jpg", "*.jpeg", "*.png", "*.bmp", "*.tif", "*.tiff"],
                         MimeTypes = ["image/*"]
                     },
                     FilePickerFileTypes.All
                 ]
             }).ConfigureAwait(true);
             if (files.Count == 0) return;
+            await ImportImagesAsync(files.Select(static file => file.TryGetLocalPath())
+                .Where(static path => !string.IsNullOrWhiteSpace(path))!
+                .Cast<string>()).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Append($"Open failed: {ex.Message}");
+        }
+    }
 
+    private async void OnOpenImageFolder(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || _activeSession is not null || _preview is not null) return;
+        try
+        {
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "选择图片文件夹",
+                AllowMultiple = false
+            }).ConfigureAwait(true);
+            string? folder = folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+            if (string.IsNullOrWhiteSpace(folder)) return;
+            string[] extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"];
+            var paths = Directory.EnumerateFiles(folder)
+                .Where(path => extensions.Contains(System.IO.Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
+                .OrderBy(System.IO.Path.GetFileName, StringComparer.OrdinalIgnoreCase);
+            await ImportImagesAsync(paths).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Append($"导入文件夹失败: {ex.Message}");
+        }
+    }
+
+    private async Task ImportImagesAsync(IEnumerable<string> paths)
+    {
+        try
+        {
+            string[] files = paths.Where(File.Exists).ToArray();
+            if (files.Length == 0) throw new InvalidOperationException("没有找到可用图片。");
+            CameraDescriptor imported = await _cameraProvider.ImportPlaylistAsync(files, CancellationToken.None)
+                .ConfigureAwait(true);
             foreach (var item in _playlist)
                 item.Thumbnail?.Dispose();
             _playlist.Clear();
@@ -348,8 +398,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             int index = 0;
             foreach (var file in files)
             {
-                string? path = file.TryGetLocalPath();
-                if (string.IsNullOrEmpty(path) || !File.Exists(path)) continue;
+                string path = file;
                 Bitmap? thumb = null;
                 try
                 {
@@ -368,6 +417,11 @@ public partial class MainWindow : Window, IAsyncDisposable
 
             if (_playlist.Count > 0)
             {
+                await RefreshCamerasAsync().ConfigureAwait(true);
+                int deviceIndex = -1;
+                for (int i = 0; i < _cameras.Length; i++)
+                    if (_cameras[i].Id == imported.Id) { deviceIndex = i; break; }
+                if (deviceIndex >= 0) CameraDeviceCombo.SelectedIndex = deviceIndex;
                 foreach (var p in _playlist) p.IsActive = false;
                 _playlist[0].IsActive = true;
                 await ShowStillPreviewAsync(_playlist[0].FilePath).ConfigureAwait(true);
@@ -388,7 +442,20 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (sender is not Border border || border.Tag is not PlaylistThumbnailItem item) return;
         foreach (var p in _playlist) p.IsActive = false;
         item.IsActive = true;
-        await ShowStillPreviewAsync(item.FilePath).ConfigureAwait(true);
+        _cameraProvider.SetStartIndex(item.Index);
+        if (_activeSession is null && _preview is null)
+            await ShowStillPreviewAsync(item.FilePath).ConfigureAwait(true);
+        if (e.ClickCount >= 2)
+            OnRunOcr(sender, new RoutedEventArgs());
+    }
+
+    private void OnActiveImageChanged(int index, string path)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var item in _playlist)
+                item.IsActive = item.Index == index;
+        }, DispatcherPriority.Background);
     }
 
     private async Task ShowStillPreviewAsync(string path)
@@ -397,7 +464,10 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             await using var fs = File.OpenRead(path);
             var bmp = new Bitmap(fs);
+            var old = _stillPreviewBitmap;
+            _stillPreviewBitmap = bmp;
             PreviewImage.Source = bmp;
+            old?.Dispose();
             PanelPlaceholder.IsVisible = false;
             _sourceWidth = bmp.PixelSize.Width;
             _sourceHeight = bmp.PixelSize.Height;
@@ -439,7 +509,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             int prefer = Math.Clamp(_settings.PreferredCameraIndex, 0, Math.Max(0, _cameras.Length - 1));
             if (_cameras.Length > 0) CameraDeviceCombo.SelectedIndex = prefer;
             else CameraModeCombo.ItemsSource = null;
-            Append($"FlashCap: {_cameras.Length} MJPEG device(s).");
+            Append($"输入源: {_cameras.Length} 个（相机 / 图片）。");
             SetStatus($"Cameras: {_cameras.Length}");
         }
         catch (Exception ex)
@@ -451,14 +521,18 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void OnCameraDeviceChanged(object? sender, SelectionChangedEventArgs e)
     {
+        int revision = ++_modeRequestRevision;
         int index = CameraDeviceCombo.SelectedIndex;
         if (index < 0 || index >= _cameras.Length) { CameraModeCombo.ItemsSource = null; return; }
         try
         {
             var device = _cameras[index];
             var modes = await _cameraProvider.GetModesAsync(device.Id, CancellationToken.None).ConfigureAwait(true);
+            if (revision != _modeRequestRevision || CameraDeviceCombo.SelectedIndex != index) return;
             CameraModeCombo.ItemsSource = modes.Select(m =>
-                $"{m.Width}×{m.Height} @ {m.FpsNumerator}/{Math.Max(1, m.FpsDenominator)}").ToList();
+                ImagePlaylistCameraProvider.IsImageDevice(device.Id)
+                    ? $"{m.Width}×{m.Height} · {m.FpsDenominator} ms/张"
+                    : $"{m.Width}×{m.Height} @ {m.FpsNumerator}/{Math.Max(1, m.FpsDenominator)} · {(m.Encoding == FrameEncoding.Jpeg ? "MJPEG" : "RGB24/32")}").ToList();
             CameraModeCombo.Tag = modes;
             int prefer = Math.Clamp(_settings.PreferredModeIndex, 0, Math.Max(0, modes.Length - 1));
             if (modes.Length > 0) CameraModeCombo.SelectedIndex = prefer;
@@ -764,6 +838,85 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
         TxtInspectorText.Text = item.Text;
         TxtInspectorMeta.Text = $"{item.Time}  {item.ConfidenceDisplay}\n{item.BoundsSummary}\nEventId={item.EventId:N}\nSource={item.SourceId}";
+    }
+
+    private async void OnCopySelectedResult(object? sender, RoutedEventArgs e)
+    {
+        if (ResultsList.SelectedItem is not ScanResultItem item || string.IsNullOrEmpty(item.Text)) return;
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is null) throw new InvalidOperationException("剪贴板不可用。");
+            await clipboard.SetTextAsync(item.Text).ConfigureAwait(true);
+            SetStatus("已复制 OCR 文本");
+        }
+        catch (Exception ex) { Append($"复制失败: {ex.Message}"); }
+    }
+
+    private void RefreshOutputQueueStatus()
+    {
+        var status = _coordinator.GetStatus();
+        string sink = status.Routes.FirstOrDefault(static route => route.Enabled)?.SinkId switch
+        {
+            "mqtt" => "MQTT",
+            "tcp" => "TCP",
+            "keyboard" => "键盘",
+            _ => "输出未启用"
+        };
+        TxtOutputQueueStatus.Text = status.Enabled
+            ? $"{sink} · 待发 {status.PendingCount} · 待核对 {status.UncertainCount}"
+            : sink;
+        BtnClearOutputQueue.IsEnabled = status.PendingCount + status.UncertainCount > 0;
+    }
+
+    private async void OnClearOutputQueue(object? sender, RoutedEventArgs e)
+    {
+        var status = _coordinator.GetStatus();
+        int total = status.PendingCount + status.UncertainCount;
+        if (total == 0) return;
+
+        var dialog = new Window
+        {
+            Title = "确认清空发送队列",
+            Width = 390,
+            Height = 150,
+            MinWidth = 390,
+            MinHeight = 150,
+            MaxWidth = 390,
+            MaxHeight = 150,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(18),
+                Spacing = 16,
+                Children =
+                {
+                    new TextBlock { Text = $"要丢弃 {total} 条待发送或待核对记录吗？此操作无法撤销。", TextWrapping = TextWrapping.Wrap },
+                    new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children =
+                        {
+                            new Button { Content = "取消", IsCancel = true },
+                            new Button { Content = "清空", IsDefault = true, Tag = "confirm" }
+                        }
+                    }
+                }
+            }
+        };
+        var buttons = ((StackPanel)((StackPanel)dialog.Content!).Children[1]).Children;
+        ((Button)buttons[0]).Click += (_, _) => dialog.Close(false);
+        ((Button)buttons[1]).Click += (_, _) => dialog.Close(true);
+        if (!await dialog.ShowDialog<bool>(this).ConfigureAwait(true)) return;
+        try
+        {
+            int cleared = _coordinator.ClearPending();
+            RefreshOutputQueueStatus();
+            SetStatus($"已清空 {cleared} 条发送记录");
+        }
+        catch (Exception ex) { Append($"清空队列失败: {ex.Message}"); }
     }
 
     private async void OnStartPreview(object? sender, RoutedEventArgs e)

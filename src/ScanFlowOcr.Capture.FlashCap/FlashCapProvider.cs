@@ -30,37 +30,40 @@ public sealed class FlashCapProvider : ICameraProvider
     private static IEnumerable<CaptureDeviceDescriptor> EnumerateUsableDescriptors()
     {
         if (!OperatingSystem.IsWindowsVersionAtLeast(6, 1))
-            return FilterJpeg(new CaptureDevices().EnumerateDescriptors());
+            return FilterUsable(new CaptureDevices().EnumerateDescriptors());
 
         string? preference = Environment.GetEnvironmentVariable(BackendEnvironmentVariable)?.Trim();
         if (string.Equals(preference, "directshow", StringComparison.OrdinalIgnoreCase))
-            return FilterJpeg(new global::FlashCap.Devices.DirectShowDevices().EnumerateDescriptors());
+            return FilterUsable(new global::FlashCap.Devices.DirectShowDevices().EnumerateDescriptors());
         if (string.Equals(preference, "vfw", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(preference, "videoforwindows", StringComparison.OrdinalIgnoreCase))
-            return FilterJpeg(new global::FlashCap.Devices.VideoForWindowsDevices().EnumerateDescriptors());
+            return FilterUsable(new global::FlashCap.Devices.VideoForWindowsDevices().EnumerateDescriptors());
         if (string.Equals(preference, "mediafoundation", StringComparison.OrdinalIgnoreCase))
-            return FilterJpeg(new global::FlashCap.Devices.MediaFoundationDevices().EnumerateDescriptors());
+            return FilterUsable(new global::FlashCap.Devices.MediaFoundationDevices().EnumerateDescriptors());
 
         // MF is preferred because it shuts down its media source cleanly on reopen.
         // Some older/UVC drivers expose MJPEG through DirectShow only, so keep a
         // compatibility fallback instead of hiding a working camera completely.
-        var mediaFoundation = FilterJpeg(new global::FlashCap.Devices.MediaFoundationDevices().EnumerateDescriptors()).ToArray();
+        var mediaFoundation = FilterUsable(new global::FlashCap.Devices.MediaFoundationDevices().EnumerateDescriptors()).ToArray();
         if (mediaFoundation.Length > 0) return mediaFoundation;
         // Match the legacy WPF provider's pre-MF behavior: the default FlashCap
         // set includes DirectShow, Video for Windows, and any other compiled-in
         // Windows backends that can expose the camera.
-        return FilterJpeg(new CaptureDevices().EnumerateDescriptors());
+        return FilterUsable(new CaptureDevices().EnumerateDescriptors());
     }
 
-    private static IEnumerable<CaptureDeviceDescriptor> FilterJpeg(IEnumerable<CaptureDeviceDescriptor> devices) =>
-        devices.Where(static device => device.Characteristics.Any(static c => c.PixelFormat == PixelFormats.JPEG));
+    private static bool IsUsable(PixelFormats format) => format is PixelFormats.JPEG or PixelFormats.RGB24 or PixelFormats.RGB32;
+    private static IEnumerable<CaptureDeviceDescriptor> FilterUsable(IEnumerable<CaptureDeviceDescriptor> devices) =>
+        devices.Where(static device => device.Characteristics.Any(static c => IsUsable(c.PixelFormat)));
     public ValueTask<ImmutableArray<CaptureMode>> GetModesAsync(CameraId device, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         lock (_gate)
-            return ValueTask.FromResult(Get(device).Characteristics.Select((c, i) => (c, i)).Where(p => p.c.PixelFormat == PixelFormats.JPEG)
+            return ValueTask.FromResult(Get(device).Characteristics.Select((c, i) => (c, i)).Where(p => IsUsable(p.c.PixelFormat))
                 .Select(p => new CaptureMode(p.i.ToString(System.Globalization.CultureInfo.InvariantCulture), p.c.Width, p.c.Height,
-                    (int)p.c.FramesPerSecond.Numerator, (int)p.c.FramesPerSecond.Denominator, FrameEncoding.Jpeg, Contracts.PixelFormat.Unknown)).ToImmutableArray());
+                    (int)p.c.FramesPerSecond.Numerator, (int)p.c.FramesPerSecond.Denominator,
+                    p.c.PixelFormat == PixelFormats.JPEG ? FrameEncoding.Jpeg : FrameEncoding.Raw,
+                    p.c.PixelFormat == PixelFormats.JPEG ? Contracts.PixelFormat.Unknown : Contracts.PixelFormat.Bgra32)).ToImmutableArray());
     }
     private CaptureDeviceDescriptor Get(CameraId id) => id.ProviderId == Id && _devices.TryGetValue(id.DeviceKey, out var d) ? d : throw new InvalidOperationException("相机已失效，请刷新设备。");
     public ValueTask<ICameraSession> OpenAsync(CameraOpenOptions options, CancellationToken cancellationToken)
@@ -70,10 +73,12 @@ public sealed class FlashCapProvider : ICameraProvider
         {
             var descriptor = Get(options.Device);
             var i = int.Parse(options.ModeId, System.Globalization.CultureInfo.InvariantCulture);
-            if (i < 0 || i >= descriptor.Characteristics.Length || descriptor.Characteristics[i].PixelFormat != PixelFormats.JPEG) throw new ArgumentException("不支持的采集模式。", nameof(options));
+            if (i < 0 || i >= descriptor.Characteristics.Length || !IsUsable(descriptor.Characteristics[i].PixelFormat)) throw new ArgumentException("不支持的采集模式。", nameof(options));
             var c = descriptor.Characteristics[i];
             ICameraSession session = new CameraSession(descriptor, c, new(options.Device, descriptor.Name, DeviceIdentityKind.BackendId, null, null),
-                new(options.ModeId, c.Width, c.Height, (int)c.FramesPerSecond.Numerator, (int)c.FramesPerSecond.Denominator, FrameEncoding.Jpeg, Contracts.PixelFormat.Unknown));
+                new(options.ModeId, c.Width, c.Height, (int)c.FramesPerSecond.Numerator, (int)c.FramesPerSecond.Denominator,
+                    c.PixelFormat == PixelFormats.JPEG ? FrameEncoding.Jpeg : FrameEncoding.Raw,
+                    c.PixelFormat == PixelFormats.JPEG ? Contracts.PixelFormat.Unknown : Contracts.PixelFormat.Bgra32));
             return ValueTask.FromResult(session);
         }
     }

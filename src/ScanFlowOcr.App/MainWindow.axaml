@@ -43,8 +43,8 @@
     </Border>
 
     <!-- Toolbar -->
-    <Border Grid.Row="1" Classes="panel-card" Margin="12,8,12,0" Padding="10,6" Height="52">
-      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+    <Border Grid.Row="1" Classes="panel-card" Margin="12,8,12,0" Padding="10,7">
+      <StackPanel Spacing="7">
         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
           <Border x:Name="PillScanStatus" Classes="chip" Padding="8,4" Margin="0,0,10,0" Height="32">
             <StackPanel Orientation="Horizontal" Spacing="6">
@@ -60,22 +60,23 @@
           <Button x:Name="RefreshCamerasButton" Classes="outline" Height="32" Margin="0,0,8,0" Content="刷新" Click="OnRefreshCameras" />
           <Border Width="1" Height="20" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,8,0" />
           <Button Classes="outline" Height="32" Margin="0,0,6,0" Content="导入图片…" Click="OnOpenImages" />
-          <TextBlock Text="模型:" Classes="muted" VerticalAlignment="Center" Margin="0,0,4,0" />
+          <Button Classes="outline" Height="32" Margin="0,0,6,0" Content="导入文件夹…" Click="OnOpenImageFolder" />
+        </WrapPanel>
+        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <TextBlock Text="OCR 模型:" Classes="muted" VerticalAlignment="Center" Margin="0,0,4,0" />
           <ComboBox x:Name="ModelCombo" Width="90" Height="32" SelectedIndex="0" Margin="0,0,8,0">
             <ComboBoxItem Content="tiny" />
             <ComboBoxItem Content="small" />
           </ComboBox>
-          <Button x:Name="RunOcrButton" Classes="outline" Height="32" Content="识别图片" Click="OnRunOcr" IsEnabled="False" />
-        </WrapPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-          <Button x:Name="StartScanButton" Classes="primary" Height="34" Content="启动扫描" Click="OnStartScan" />
-          <Button x:Name="StopScanButton" Classes="outline" Height="34" Content="停止扫描" Click="OnStopScan" IsEnabled="False" />
-          <Button x:Name="StartPreviewButton" Classes="outline" Height="34" Content="仅预览" Click="OnStartPreview" />
-          <Button x:Name="StopPreviewButton" Classes="outline" Height="34" Content="停预览" Click="OnStopPreview" IsEnabled="False" />
-          <Button x:Name="OcrFrameButton" Classes="outline" Height="34" Content="识别当前帧" Click="OnOcrCurrentFrame" IsEnabled="False" />
+          <Button x:Name="RunOcrButton" Classes="outline" Height="32" Margin="0,0,16,0" Content="识别图片" Click="OnRunOcr" IsEnabled="False" />
+          <Button x:Name="StartScanButton" Classes="primary" Height="34" Margin="0,0,6,0" Content="启动扫描" Click="OnStartScan" />
+          <Button x:Name="StopScanButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="停止扫描" Click="OnStopScan" IsEnabled="False" />
+          <Button x:Name="StartPreviewButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="仅预览" Click="OnStartPreview" />
+          <Button x:Name="StopPreviewButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="停预览" Click="OnStopPreview" IsEnabled="False" />
+          <Button x:Name="OcrFrameButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="识别当前帧" Click="OnOcrCurrentFrame" IsEnabled="False" />
           <Button x:Name="ClearDedupeButton" Classes="ghost" Height="34" Content="重置去重" Click="OnClearDedupe" ToolTip.Tip="清空会话去重历史" />
-        </StackPanel>
-      </Grid>
+        </WrapPanel>
+      </StackPanel>
     </Border>
 
     <!-- Workspace -->
@@ -207,7 +208,7 @@
                   </Border>
                 </StackPanel>
               </Border>
-              <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="100">
+              <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="116">
                 <ItemsControl x:Name="PlaylistItems" Margin="8,0,8,8">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -216,7 +217,8 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:PlaylistThumbnailItem">
-                      <Border Width="88" Height="72" CornerRadius="4" ClipToBounds="True"
+                      <StackPanel Width="88" Spacing="3">
+                      <Border Classes="playlist-card" Classes.active="{Binding IsActive}" Width="88" Height="72" CornerRadius="4" ClipToBounds="True"
                               BorderThickness="2"
                               BorderBrush="{DynamicResource BorderSubtleBrush}"
                               Background="{DynamicResource SurfaceBackgroundBrush}"
@@ -229,6 +231,8 @@
                           </Border>
                         </Grid>
                       </Border>
+                      <TextBlock Text="{Binding FileName}" FontSize="10" Classes="muted" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
+                      </StackPanel>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -257,7 +261,7 @@
                              FontFamily="Cascadia Code, Consolas, monospace" Classes="muted" />
                 </Border>
               </StackPanel>
-              <TextBlock Grid.Column="1" Text="TurboJPEG · MJPEG · OCR" FontSize="11"
+              <TextBlock Grid.Column="1" Text="FlashCap · PP-OCRv6" FontSize="11"
                          FontFamily="Cascadia Code, Consolas, monospace" Classes="muted" />
             </Grid>
           </Border>
@@ -300,7 +304,10 @@
             <Border Grid.Row="1" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="8">
               <StackPanel Spacing="4">
-                <TextBlock Text="详情" FontSize="12" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="OCR 详情" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <Button Grid.Column="1" Classes="outline" Height="24" Content="复制文本" Click="OnCopySelectedResult" />
+                </Grid>
                 <TextBlock x:Name="TxtInspectorText" Text="选择一条结果查看详情" TextWrapping="Wrap" FontSize="12" />
                 <TextBlock x:Name="TxtInspectorMeta" Classes="muted" TextWrapping="Wrap" FontSize="11"
                            FontFamily="Cascadia Code, Consolas, monospace" />
@@ -352,9 +359,14 @@
 
     <Border Grid.Row="3" Background="{DynamicResource SurfaceBackgroundBrush}"
             BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="14,0">
-      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-        <TextBlock x:Name="TxtFooterHint" Text="ScanFlow-OCR · 仅 OCR（无条码）· 设置可持久化" Classes="muted" />
-        <TextBlock Grid.Column="1" Text="Avalonia 12.1.2" Classes="muted" />
+      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+        <TextBlock x:Name="TxtFooterHint" Text="ScanFlow-OCR · PP-OCRv6 · 跨平台 OCR 工作台" Classes="muted" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0">
+          <TextBlock x:Name="TxtOutputQueueStatus" Text="输出未启用" Classes="muted" VerticalAlignment="Center" />
+          <Button x:Name="BtnClearOutputQueue" Classes="ghost" Height="24" Content="清空队列"
+                  Click="OnClearOutputQueue" IsEnabled="False" />
+        </StackPanel>
+        <TextBlock Grid.Column="2" Text="Avalonia 12.1.2" Classes="muted" />
       </Grid>
     </Border>
   </Grid>

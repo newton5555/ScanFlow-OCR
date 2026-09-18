@@ -62,6 +62,12 @@ public sealed class VideoForWindowsDevices : CaptureDevices
                             NativeMethods.Compression.MJPG, 640, 480, 0, 30, false)!,
                         NativeMethods.CreateVideoCharacteristics(
                             NativeMethods.Compression.MJPG, 640, 480, 0, 15, false)!,
+                        // VfW cannot enumerate real modes. Many drivers reject MJPG
+                        // but accept a 24-bit DIB, so offer a raw fallback explicitly.
+                        NativeMethods.CreateVideoCharacteristics(
+                            NativeMethods.Compression.BI_RGB, 640, 480, 24, 30, false)!,
+                        NativeMethods.CreateVideoCharacteristics(
+                            NativeMethods.Compression.BI_RGB, 640, 480, 24, 15, false)!,
                         NativeMethods.CreateVideoCharacteristics(
                             NativeMethods.Compression.YUYV, 640, 480, 16, 30, false)!,
                         NativeMethods.CreateVideoCharacteristics(

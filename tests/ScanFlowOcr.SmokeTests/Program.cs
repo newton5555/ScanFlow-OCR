@@ -1,5 +1,7 @@
+using System.Collections.Immutable;
 using System.Buffers.Binary;
 using System.Diagnostics;
+using System.Text.Json;
 using ScanFlowOcr.Capture.FlashCap;
 using ScanFlowOcr.Contracts;
 using ScanFlowOcr.Imaging;
@@ -100,6 +102,63 @@ Check(Enum.IsDefined(ScanFlowOcr.Contracts.DedupeMode.Session), "dedupe Session"
 Check(Enum.IsDefined(ScanFlowOcr.Contracts.DedupeMode.Cooldown), "dedupe Cooldown");
 Check(typeof(ScanFlowOcr.Runtime.ScanSession).IsClass, "ScanSession type present");
 
+{
+    string nativeJpeg = Path.GetFullPath(OperatingSystem.IsWindows()
+        ? "native/win-x64/turbojpeg.dll" : "native/linux-x64/libturbojpeg.so");
+    if (File.Exists(nativeJpeg))
+    {
+        byte[] pixels = new byte[8 * 8 * 3];
+        byte[] jpeg = StillImages.EncodeJpegFromBgr(pixels, 8, 8, 90);
+        var cameraId = new CameraId("test", "jpeg");
+        var mode = new CaptureMode("jpeg", 8, 8, 1, 1, FrameEncoding.Jpeg, PixelFormat.Unknown);
+        var profile = new SessionProfile(1, new CameraSourceProfile(new CameraOpenOptions(cameraId, mode.ModeId)),
+            WorkflowMode.OcrOnly,
+            new OcrStageProfile("probe", new OcrSettings([], OcrLayout.TextBlock,
+                JsonSerializer.SerializeToElement(new { })), null),
+            new SchedulingProfile(1, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2),
+                TimeSpan.FromSeconds(2), 1024 * 1024, 4 * 1024 * 1024),
+            new PreviewProfile(false, 1, 0, 0),
+            new DedupeProfile(DedupeMode.Session, TimeSpan.FromSeconds(1), 10), []);
+        await using var session = new ScanFlowOcr.Runtime.ScanSession(
+            new ProbeCameraProvider(cameraId, mode, jpeg), new ProbeOcrFactory(), nativeJpeg, profile);
+        await session.StartAsync(CancellationToken.None);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        bool recognized = false;
+        await foreach (var evt in session.ReadEventsAsync(deadline.Token))
+        {
+            if (evt is ScanRecordReady { Record.TextLines.Length: > 0 })
+            {
+                recognized = true;
+                break;
+            }
+            if (evt is StateChanged { State: SessionState.Faulted } fault)
+                throw new InvalidOperationException("JPEG session fault: " + fault.Reason);
+        }
+        Check(recognized, "JPEG camera frame reaches OCR as BGR24 without ROI");
+        await session.StopAsync(CancellationToken.None);
+
+        var rawMode = mode with { Encoding = FrameEncoding.Raw, PixelFormat = PixelFormat.Bgra32 };
+        await using var rawSession = new ScanFlowOcr.Runtime.ScanSession(
+            new ProbeCameraProvider(cameraId, rawMode, new byte[8 * 8 * 4]),
+            new ProbeOcrFactory(), nativeJpeg, profile);
+        await rawSession.StartAsync(CancellationToken.None);
+        using var rawDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        bool rawRecognized = false;
+        await foreach (var evt in rawSession.ReadEventsAsync(rawDeadline.Token))
+        {
+            if (evt is ScanRecordReady { Record.TextLines.Length: > 0 })
+            {
+                rawRecognized = true;
+                break;
+            }
+            if (evt is StateChanged { State: SessionState.Faulted } fault)
+                throw new InvalidOperationException("Raw session fault: " + fault.Reason);
+        }
+        Check(rawRecognized, "BGRA image frame reaches OCR as BGR24 without ROI");
+        await rawSession.StopAsync(CancellationToken.None);
+    }
+}
+
 if (args.Any(static arg => string.Equals(arg, "--camera", StringComparison.OrdinalIgnoreCase)))
 {
     Console.WriteLine("=== camera probe ===");
@@ -132,4 +191,58 @@ if (args.Any(static arg => string.Equals(arg, "--camera", StringComparison.Ordin
 Console.WriteLine(Environment.ExitCode == 0
     ? "All smoke checks passed."
     : "Smoke checks passed, but the optional camera probe failed.");
+
+file sealed class ProbeCameraProvider(CameraId id, CaptureMode mode, byte[] pixels) : ICameraProvider
+{
+    public string Id => id.ProviderId;
+    public ValueTask<ImmutableArray<CameraDescriptor>> EnumerateAsync(CancellationToken token) =>
+        ValueTask.FromResult(ImmutableArray.Create(new CameraDescriptor(id, "probe", DeviceIdentityKind.BackendId, null, null)));
+    public ValueTask<ImmutableArray<CaptureMode>> GetModesAsync(CameraId device, CancellationToken token) =>
+        ValueTask.FromResult(ImmutableArray.Create(mode));
+    public ValueTask<ICameraSession> OpenAsync(CameraOpenOptions options, CancellationToken token) =>
+        ValueTask.FromResult<ICameraSession>(new ProbeCameraSession(id, mode, pixels));
+}
+
+file sealed class ProbeCameraSession(CameraId id, CaptureMode mode, byte[] pixels) : ICameraSession
+{
+    public string SourceId => id.DeviceKey;
+    public SourceState State { get; private set; } = SourceState.Open;
+    public CameraDescriptor Device => new(id, "probe", DeviceIdentityKind.BackendId, null, null);
+    public CaptureMode NegotiatedMode => mode;
+    public ICameraControls? Controls => null;
+    public ValueTask StartAsync(Guid epoch, IFrameReceiver receiver, CancellationToken token)
+    {
+        State = SourceState.Running;
+        var stamp = new FrameStamp(new FrameId(epoch, 1), SourceId, 8, 8, Stopwatch.GetTimestamp(), null);
+        var layout = mode.Encoding == FrameEncoding.Jpeg
+            ? new ImageLayout(FrameEncoding.Jpeg, PixelFormat.Unknown, 8, 8, [],
+                ColorRange.Unspecified, ColorMatrix.Unspecified)
+            : new ImageLayout(FrameEncoding.Raw, PixelFormat.Bgra32, 8, 8,
+                [new PlaneLayout(0, 32, 32, 8)], ColorRange.Full, ColorMatrix.Unspecified);
+        receiver.OnFrame(new CapturedFrame(stamp, layout, pixels));
+        return ValueTask.CompletedTask;
+    }
+    public ValueTask StopAsync(CancellationToken token) { State = SourceState.Stopped; return ValueTask.CompletedTask; }
+    public ValueTask DisposeAsync() { State = SourceState.Disposed; return ValueTask.CompletedTask; }
+}
+
+file sealed class ProbeOcrFactory : IOcrReaderFactory
+{
+    public string ProviderId => "probe";
+    public ValueTask<IOcrReader> CreateAsync(OcrSettings settings, CancellationToken token) =>
+        ValueTask.FromResult<IOcrReader>(new ProbeOcrReader());
+}
+
+file sealed class ProbeOcrReader : IOcrReader
+{
+    public EngineDescriptor Descriptor => new("probe", "1", [PixelFormat.Bgr24], true, false, false, 1);
+    public ValueTask<EngineBatch<OcrLine>> ReadAsync(ImageInput input, RecognitionRequest request, CancellationToken token)
+    {
+        RawImages.ValidateBgr(input);
+        return ValueTask.FromResult(new EngineBatch<OcrLine>(request.Analysis, StageStatus.Completed,
+            [new OcrLine("probe", new Quad(new(0, 0), new(8, 0), new(8, 8), new(0, 8)), 1, null, [])],
+            TimeSpan.Zero, null));
+    }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
 

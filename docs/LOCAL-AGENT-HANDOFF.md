@@ -72,10 +72,11 @@
 2. **真机相机验证** — Linux CI 无摄像头；Windows 默认先试 MF MJPEG，无可用设备时回退 FlashCap 旧 Windows 后端（DirectShow / VfW）；仍需在真机验证 TurboJPEG → 连续 OCR → 去重 → 输出。
 3. **键盘打入业务窗口** — 验证 `SendInput` 打入记事本/业务 App；Linux `/dev/uinput` 权限与 ASCII 限制。
 4. **ROI 编辑体验** — 已支持画面内拖拽框选、区域移动、四角调整、全画面/取消/保存、Esc/Enter 快捷键；设置仍保留百分比入口。
-5. **Playlist 作为“本地图像源设备”** — 私有 `DesktopCameraProvider.ImportPlaylistAsync` 可进会话循环；公开版仍是静态图列表 + 手动「识别图片」。
+5. **Playlist 作为“本地图像源设备”** — 已接入连续会话，支持文件/文件夹导入、缩略图跳转及 0.5/1/2/5 秒轮播；仍需 UI 与真机验收。
 6. **UntilAbsent 等高级 HUD** — 去重模式已有；FPS/丢帧计时器、主窗口位置/尺寸/最大化记忆已补齐，仍可继续丰富 HUD 细节。
 7. **打包** — Windows folder publish 已验证路径并随包复制 `native/win-x64/turbojpeg.dll`；安装包 / 单文件发布仍未做。
-8. **Clipboard** — 保持 deferred。
+8. **Clipboard** — 自动输出保持 deferred；结果详情的手动复制已对齐 WPF。
+9. **格式回归** — 连续 OCR 的 JPEG 帧和 BGRA32 帧即使未设置 ROI，也必须转换成 BGR24。Smoke test 已覆盖；RGB24 相机模式经 FlashCap BMP 转 BGRA32 后走相同路径。VfW RGB24 模式是后端预设而非硬件枚举结果，需真机启动确认。
 
 ---
 
@@ -85,7 +86,7 @@
 2. 对照 `F:\Projects\ScanFlow` + `prototype/index.html` 做视觉与交互对等（**仅 OCR 相关面板**）。
 3. 接真摄像头跑「启动扫描」：确认预览线程安全、ROI 生效、去重模式、MQTT/TCP/键盘。
 4. 实现或完善 ROI 画面内编辑（可移植私有 RoiEditor 思路到 Avalonia）。
-5. （可选）把图片 playlist 接入会话源，接近私有 Replay/LocalImage 行为。
+5. 验证图片 playlist 连续会话与缩略图跳转，复核大图/混合尺寸的性能与交互。
 6. 准备 Windows 打包（含 `native/win-x64/turbojpeg.dll`）。
 7. **不要**引入 Phenix / DecodeP1 / CoreHost / MemoryModule / 码制 UI。
 
@@ -105,7 +106,7 @@ dotnet run --project src/ScanFlowOcr.App -c Release
 - `native/linux-x64/libturbojpeg.so`
 - 或环境变量 `SCANFLOW_OCR_TURBOJPEG_PATH`
 - App 构建时复制到输出目录 `native/{rid}/`
-- **静态图 OCR 不需要** TurboJPEG；**相机 MJPEG / 连续扫描需要**
+- **静态图 OCR 不需要** TurboJPEG；当前连续扫描（包括本地图像源）会创建 JPEG 解码器，因而仍要求该 native。MJPEG 帧解码必须使用它。
 
 ### Windows camera backend
 默认优先 Media Foundation；若没有可用 MJPEG 描述符，会回退 FlashCap 默认 Windows 后端集合（DirectShow / Video for Windows）。诊断驱动时可设置 `SCANFLOW_OCR_CAMERA_BACKEND=mediafoundation`、`directshow` 或 `vfw`（`videoforwindows`）。

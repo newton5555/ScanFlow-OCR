@@ -241,8 +241,6 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
     {
         if (frame.Input.Layout.Encoding == FrameEncoding.Jpeg)
         {
-            if (region is null)
-                return (null, null, frame.Input);
             var decoded = decoder.DecodeBgr(frame.Input, _allocator);
             var cropped = CropBgr(decoded.Input, region);
             return (decoded, cropped, cropped?.Input ?? decoded.Input);
@@ -254,6 +252,11 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
             return (null, croppedBgr, croppedBgr?.Input ?? frame.Input);
         }
         RawImages.ValidateBgra(frame.Input);
+        if (region is null)
+        {
+            var converted = RawImages.ToBgr(frame.Input, _allocator);
+            return (converted, null, converted.Input);
+        }
         var croppedBgra = CropBgraToBgr(frame.Input, region);
         return (null, croppedBgra, croppedBgra?.Input ?? frame.Input);
     }

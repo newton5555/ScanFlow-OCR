@@ -31,6 +31,9 @@
       <Setter Property="CornerRadius" Value="3" />
       <Setter Property="Padding" Value="7,2" />
     </Style>
+    <Style Selector="Border.playlist-card.active">
+      <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
+    </Style>
     <Style Selector="Button.primary">
       <Setter Property="Background" Value="{DynamicResource BrandBrush}" />
       <Setter Property="Foreground" Value="White" />
