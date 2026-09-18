@@ -12,6 +12,9 @@ using ScanFlowOcr.Imaging;
 
 namespace ScanFlowOcr.App;
 
+internal readonly record struct CameraPreviewMetrics(
+    long FramesReceived, long FramesDropped, long FramesDecoded);
+
 /// <summary>
 /// FlashCap MJPEG session → TurboJPEG BGRA decode → Avalonia preview bitmap.
 /// Decode runs off the UI thread; all WriteableBitmap / Image.Source / UI callbacks
@@ -39,6 +42,9 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
     private int _latestHeight;
     private FrameStamp? _latestStamp;
     private WriteableBitmap? _bitmap;
+    private long _framesReceived;
+    private long _framesDropped;
+    private long _framesDecoded;
 
     public CameraPreviewController(
         Action<string> log,
@@ -53,6 +59,11 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
     }
 
     public bool IsRunning => _session is { State: SourceState.Running or SourceState.Starting };
+
+    public CameraPreviewMetrics GetMetrics() => new(
+        Interlocked.Read(ref _framesReceived),
+        Interlocked.Read(ref _framesDropped),
+        Interlocked.Read(ref _framesDecoded));
 
     public bool TryGetLatestBgra(out byte[] bgra, out int width, out int height, out FrameStamp stamp)
     {
@@ -88,6 +99,9 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
         PostUi(() => _setError(""));
         _decoder?.Dispose();
         _decoder = new JpegDecoder(libraryPath);
+        Interlocked.Exchange(ref _framesReceived, 0);
+        Interlocked.Exchange(ref _framesDropped, 0);
+        Interlocked.Exchange(ref _framesDecoded, 0);
         PostUi(() => _log($"TurboJPEG loaded: {libraryPath}"));
 
         // Take ownership of the session for the lifetime of this controller.
@@ -143,10 +157,19 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
     {
         if (Volatile.Read(ref _disposed) != 0) return;
         if (Volatile.Read(ref _acceptFrames) == 0) return;
+        Interlocked.Increment(ref _framesReceived);
         JpegDecoder? decoder = _decoder;
         if (decoder is null) return;
-        if (frame.Layout.Encoding != FrameEncoding.Jpeg) return;
-        if (Interlocked.CompareExchange(ref _decodeBusy, 1, 0) != 0) return;
+        if (frame.Layout.Encoding != FrameEncoding.Jpeg)
+        {
+            Interlocked.Increment(ref _framesDropped);
+            return;
+        }
+        if (Interlocked.CompareExchange(ref _decodeBusy, 1, 0) != 0)
+        {
+            Interlocked.Increment(ref _framesDropped);
+            return;
+        }
 
         byte[] jpeg = frame.Buffer.ToArray();
         var stamp = frame.Stamp;
@@ -170,6 +193,7 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
                 int w = layout.Width;
                 int h = layout.Height;
                 int stride = w * 4;
+                Interlocked.Increment(ref _framesDecoded);
 
                 if (Volatile.Read(ref _acceptFrames) == 0 ||
                     Volatile.Read(ref _disposed) != 0 ||
@@ -226,6 +250,7 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
             }
             catch (Exception ex)
             {
+                Interlocked.Increment(ref _framesDropped);
                 PostUi(() => _setError($"TurboJPEG decode failed: {ex.Message}"));
             }
             finally

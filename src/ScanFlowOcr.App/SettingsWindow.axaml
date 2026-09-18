@@ -71,23 +71,41 @@
           <RadioButton x:Name="RbOutMqtt" Content="MQTT" GroupName="Out" />
           <RadioButton x:Name="RbOutTcp" Content="TCP" GroupName="Out" />
         </StackPanel>
-        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
           <TextBlock VerticalAlignment="Center" Classes="muted" Text="键盘目标" />
           <TextBox x:Name="KeyboardTargetBox" Grid.Column="1" Text="notepad.exe" />
-          <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="MQTT Broker" />
-          <TextBox x:Name="MqttBrokerBox" Grid.Row="1" Grid.Column="1" Text="localhost" />
-          <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="MQTT 端口 / 主题" />
-          <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="键盘结束键" />
+          <ComboBox x:Name="KeyboardSuffixCombo" Grid.Row="1" Grid.Column="1">
+            <ComboBoxItem Content="Enter 回车" Tag="Enter" />
+            <ComboBoxItem Content="Tab 制表符" Tag="Tab" />
+            <ComboBoxItem Content="无" Tag="None" />
+          </ComboBox>
+          <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="同帧发送方式" />
+          <ComboBox x:Name="KeyboardSendModeCombo" Grid.Row="2" Grid.Column="1">
+            <ComboBoxItem Content="合并发送（多行拼接）" Tag="Combined" />
+            <ComboBoxItem Content="独立发送（逐行结束）" Tag="Individual" />
+          </ComboBox>
+          <TextBlock Grid.Row="3" VerticalAlignment="Center" Classes="muted" Text="合并分隔符" />
+          <TextBox x:Name="KeyboardSeparatorBox" Grid.Row="3" Grid.Column="1" Text=" | " />
+          <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="muted" Text="目标未就绪行为" />
+          <ComboBox x:Name="KeyboardTargetActionCombo" Grid.Row="4" Grid.Column="1">
+            <ComboBoxItem Content="保持队列，等待前台" Tag="KeepInQueue" />
+            <ComboBoxItem Content="直接丢弃本次输入" Tag="Discard" />
+          </ComboBox>
+          <TextBlock Grid.Row="5" VerticalAlignment="Center" Classes="muted" Text="MQTT Broker" />
+          <TextBox x:Name="MqttBrokerBox" Grid.Row="5" Grid.Column="1" Text="localhost" />
+          <TextBlock Grid.Row="6" VerticalAlignment="Center" Classes="muted" Text="MQTT 端口 / 主题" />
+          <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Spacing="8">
             <TextBox x:Name="MqttPortBox" Width="80" Text="1883" />
             <TextBox x:Name="MqttTopicBox" Width="280" Text="scanflow-ocr/scans" />
           </StackPanel>
-          <TextBlock Grid.Row="3" VerticalAlignment="Center" Classes="muted" Text="TCP Host:Port" />
-          <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+          <TextBlock Grid.Row="7" VerticalAlignment="Center" Classes="muted" Text="TCP Host:Port" />
+          <StackPanel Grid.Row="7" Grid.Column="1" Orientation="Horizontal" Spacing="8">
             <TextBox x:Name="TcpHostBox" Width="160" Text="127.0.0.1" />
             <TextBox x:Name="TcpPortBox" Width="80" Text="9100" />
           </StackPanel>
-          <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="muted" Text="队列容量" />
-          <TextBox x:Name="QueueCapacityBox" Grid.Row="4" Grid.Column="1" Width="120" Text="1000" />
+          <TextBlock Grid.Row="8" VerticalAlignment="Center" Classes="muted" Text="队列容量" />
+          <TextBox x:Name="QueueCapacityBox" Grid.Row="8" Grid.Column="1" Width="120" Text="1000" />
         </Grid>
 
         <TextBlock x:Name="TxtError" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" IsVisible="False" />

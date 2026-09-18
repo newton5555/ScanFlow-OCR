@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using ScanFlowOcr.App.Models;
 using ScanFlowOcr.Contracts;
+using ScanFlowOcr.Outputs;
 
 namespace ScanFlowOcr.App;
 
@@ -53,6 +54,10 @@ public partial class SettingsWindow : Window
         RbOutMqtt.IsChecked = _draft.MqttEnabled;
         RbOutTcp.IsChecked = _draft.TcpEnabled;
         KeyboardTargetBox.Text = _draft.KeyboardTargetProcess;
+        SelectTagged(KeyboardSuffixCombo, _draft.KeyboardSuffix.ToString());
+        SelectTagged(KeyboardSendModeCombo, _draft.KeyboardSendMode.ToString());
+        KeyboardSeparatorBox.Text = _draft.KeyboardSeparator;
+        SelectTagged(KeyboardTargetActionCombo, _draft.KeyboardTargetAction.ToString());
         MqttBrokerBox.Text = _draft.MqttBroker;
         MqttPortBox.Text = _draft.MqttPort.ToString(CultureInfo.InvariantCulture);
         MqttTopicBox.Text = _draft.MqttTopic;
@@ -128,6 +133,16 @@ public partial class SettingsWindow : Window
         _draft.MqttEnabled = RbOutMqtt.IsChecked == true;
         _draft.TcpEnabled = RbOutTcp.IsChecked == true;
         _draft.KeyboardTargetProcess = KeyboardTargetBox.Text?.Trim() ?? "notepad.exe";
+        if (KeyboardSuffixCombo.SelectedItem is ComboBoxItem suffixItem &&
+            Enum.TryParse<KeyboardSuffix>(suffixItem.Tag?.ToString(), out var suffix))
+            _draft.KeyboardSuffix = suffix;
+        if (KeyboardSendModeCombo.SelectedItem is ComboBoxItem sendModeItem &&
+            Enum.TryParse<KeyboardSendMode>(sendModeItem.Tag?.ToString(), out var sendMode))
+            _draft.KeyboardSendMode = sendMode;
+        _draft.KeyboardSeparator = KeyboardSeparatorBox.Text ?? " | ";
+        if (KeyboardTargetActionCombo.SelectedItem is ComboBoxItem actionItem &&
+            Enum.TryParse<KeyboardTargetAction>(actionItem.Tag?.ToString(), out var action))
+            _draft.KeyboardTargetAction = action;
         _draft.MqttBroker = MqttBrokerBox.Text?.Trim() ?? "localhost";
         _draft.MqttPort = ParseInt(MqttPortBox.Text, 1883);
         _draft.MqttTopic = MqttTopicBox.Text?.Trim() ?? "scanflow-ocr/scans";
@@ -144,6 +159,19 @@ public partial class SettingsWindow : Window
 
     private static int ParseInt(string? text, int fallback) =>
         int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v) ? v : fallback;
+
+    private static void SelectTagged(ComboBox combo, string tag)
+    {
+        foreach (var item in combo.Items)
+        {
+            if (item is ComboBoxItem comboItem &&
+                string.Equals(comboItem.Tag?.ToString(), tag, StringComparison.OrdinalIgnoreCase))
+            {
+                combo.SelectedItem = comboItem;
+                return;
+            }
+        }
+    }
 
     private static double ParseDouble(string? text, double fallback) =>
         double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : fallback;

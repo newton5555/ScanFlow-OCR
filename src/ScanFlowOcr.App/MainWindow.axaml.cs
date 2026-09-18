@@ -62,6 +62,10 @@ public partial class MainWindow : Window, IAsyncDisposable
     private int _sourceWidth;
     private int _sourceHeight;
     private DispatcherTimer? _metricsTimer;
+    private string _metricSource = "";
+    private long _metricLastCount;
+    private long _metricLastTicks;
+    private double _metricFps;
 
     private enum RoiDragMode { None, Create, Move, NorthWest, NorthEast, SouthWest, SouthEast }
 
@@ -112,13 +116,59 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void RefreshSessionMetrics()
     {
-        if (_activeSession is null)
+        if (_activeSession is not null)
         {
-            TxtSessionMetrics.Text = "帧 0 / 丢 0";
+            var snap = _activeSession.GetSnapshot();
+            double fps = UpdateMetricRate("session", snap.FramesReceived);
+            TxtSessionMetrics.Text = $"帧 {snap.FramesReceived} · {fps:0.0} FPS / 丢 {snap.FramesDropped}";
+            TxtPreviewMetrics.Text = _sourceWidth > 0
+                ? $"{_sourceWidth}×{_sourceHeight} · {fps:0.0} FPS"
+                : "会话预览中";
             return;
         }
-        var snap = _activeSession.GetSnapshot();
-        TxtSessionMetrics.Text = $"帧 {snap.FramesReceived} / 丢 {snap.FramesDropped} / {snap.State}";
+
+        if (_preview is { IsRunning: true } preview)
+        {
+            var metrics = preview.GetMetrics();
+            double fps = UpdateMetricRate("preview", metrics.FramesDecoded);
+            TxtSessionMetrics.Text = $"预览 {metrics.FramesDecoded}/{metrics.FramesReceived} · {fps:0.0} FPS / 丢 {metrics.FramesDropped}";
+            TxtPreviewMetrics.Text = _sourceWidth > 0
+                ? $"{_sourceWidth}×{_sourceHeight} · {fps:0.0} FPS"
+                : "预览中";
+            return;
+        }
+
+        UpdateMetricRate("idle", 0);
+        TxtSessionMetrics.Text = "帧 0 · 0.0 FPS / 丢 0";
+        TxtPreviewMetrics.Text = PreviewImage.Source is not null && _sourceWidth > 0
+            ? $"静态图 {_sourceWidth}×{_sourceHeight}"
+            : "未启用";
+    }
+
+    private double UpdateMetricRate(string source, long count)
+    {
+        long now = Stopwatch.GetTimestamp();
+        if (!string.Equals(_metricSource, source, StringComparison.Ordinal))
+        {
+            _metricSource = source;
+            _metricLastCount = count;
+            _metricLastTicks = now;
+            _metricFps = 0;
+            return 0;
+        }
+
+        long previousCount = _metricLastCount;
+        long previousTicks = _metricLastTicks;
+        _metricLastCount = count;
+        _metricLastTicks = now;
+        double seconds = (now - previousTicks) / (double)Stopwatch.Frequency;
+        long delta = count - previousCount;
+        if (seconds > 0 && delta >= 0)
+        {
+            double instant = delta / seconds;
+            _metricFps = _metricFps <= 0 ? instant : (_metricFps * 0.65) + (instant * 0.35);
+        }
+        return _metricFps;
     }
 
     private async void OnClosed(object? sender, EventArgs e)
