@@ -288,7 +288,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             Append("扫描运行中已锁定设置，请先停止。");
             return;
         }
-        var win = new SettingsWindow(_settings, _settingsManager.ActiveFilePath);
+        var win = new SettingsWindow(_settings, _settingsManager.ActiveFilePath, _coordinator);
         var result = await win.ShowDialog<AppSettings?>(this).ConfigureAwait(true);
         if (result is null) return;
         await _settingsManager.SaveAsync(result).ConfigureAwait(true);
@@ -510,7 +510,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             if (_cameras.Length > 0) CameraDeviceCombo.SelectedIndex = prefer;
             else CameraModeCombo.ItemsSource = null;
             Append($"输入源: {_cameras.Length} 个（相机 / 图片）。");
-            SetStatus($"Cameras: {_cameras.Length}");
+            SetStatus(_cameras.Length == 0 ? "未找到输入源" : $"已就绪 · {_cameras.Length} 个输入源");
         }
         catch (Exception ex)
         {
@@ -762,7 +762,19 @@ public partial class MainWindow : Window, IAsyncDisposable
                 AddRecord(ready.Record);
                 break;
             case StateChanged state:
-                SetStatus(state.State.ToString());
+                SetStatus(state.State switch
+                {
+                    SessionState.Created => "已创建",
+                    SessionState.Starting => "启动中",
+                    SessionState.Running => "正在扫描",
+                    SessionState.Reconfiguring => "正在切换配置",
+                    SessionState.Reconnecting => "正在重连相机",
+                    SessionState.Stopping => "停止中",
+                    SessionState.Stopped => "已停止",
+                    SessionState.Faulted => "会话故障",
+                    SessionState.Disposed => "已关闭",
+                    _ => state.State.ToString()
+                });
                 if (state.State == SessionState.Faulted)
                     Append($"会话故障: {state.Reason}");
                 break;
@@ -826,6 +838,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         foreach (var item in src.Take(200))
             _filteredResults.Add(item);
         TxtResultCount.Text = $"{_filteredResults.Count}/{_allResults.Count} 行";
+        PanelEmptyResults.IsVisible = _filteredResults.Count == 0;
     }
 
     private void OnResultSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -972,7 +985,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 OcrFrameButton.IsEnabled = true;
                 StartScanButton.IsEnabled = false;
                 SetPreviewChrome(true, scanning: false);
-                SetStatus("Preview running.");
+                SetStatus("实时预览中");
             }
             catch
             {
@@ -999,7 +1012,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             OcrFrameButton.IsEnabled = false;
             StartScanButton.IsEnabled = true;
             SetPreviewChrome(false, scanning: false);
-            SetStatus("Preview stopped.");
+            SetStatus("预览已停止");
         }).ConfigureAwait(true);
     }
 
@@ -1063,13 +1076,13 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (batch.Status == StageStatus.Faulted)
         {
             Append($"OCR faulted: {batch.Fault?.Code} {batch.Fault?.Message}");
-            SetStatus("OCR faulted.");
+            SetStatus("OCR 识别故障");
             return;
         }
         var record = new ScanRecord(Guid.NewGuid(), new AnalysisId(stamp.Id, 1), stamp, DateTimeOffset.UtcNow,
             batch.Items, ImmutableDictionary<string, string>.Empty);
         AddRecord(record);
-        SetStatus($"OCR {batch.Status}: {batch.Items.Length} line(s) in {batch.EngineTime.TotalMilliseconds:0} ms.");
+        SetStatus($"OCR {batch.Status} · {batch.Items.Length} 行 · {batch.EngineTime.TotalMilliseconds:0} ms");
     }
 
     private void OnApplyOutput(object? sender, RoutedEventArgs e)
@@ -1087,7 +1100,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             _settings.TcpPort = int.TryParse(TcpPort.Text, out int tp) ? tp : 9100;
             _coordinator.Configure(_settings.GetOutputRoutes());
             Append("输出路由已应用（未自动落盘；请用设置窗口保存）。");
-            SetStatus("Output applied");
+            SetStatus("输出设置已应用");
         }
         catch (Exception ex)
         {
@@ -1139,7 +1152,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         catch (Exception ex)
         {
             Append($"Error: {ex.GetType().Name}: {ex.Message}");
-            SetStatus("Error.");
+            SetStatus("运行出错");
         }
         finally
         {

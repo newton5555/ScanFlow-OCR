@@ -7,9 +7,11 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
-  <Grid RowDefinitions="*,Auto" Margin="16">
-    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
-      <StackPanel Spacing="14">
+  <Grid RowDefinitions="*,Auto,Auto" Margin="16">
+    <TabControl Grid.Row="0">
+      <TabItem Header="识别算法" FontSize="12" Padding="12,8">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,10,8,4">
+          <StackPanel Spacing="14">
         <TextBlock Text="OCR 与识别" Classes="section-title" />
         <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
           <TextBlock Grid.Row="0" VerticalAlignment="Center" Classes="muted" Text="模型" />
@@ -43,6 +45,12 @@
           <TextBlock Grid.Column="6" VerticalAlignment="Center" Classes="muted" Text="H%" />
           <TextBox x:Name="RoiHBox" Grid.Column="7" Text="80" />
         </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="相机与采集" FontSize="12" Padding="12,8">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,10,8,4">
+          <StackPanel Spacing="14">
 
         <TextBlock Text="预览" Classes="section-title" Margin="0,8,0,0" />
         <CheckBox x:Name="ChkPreviewEnabled" Content="启用会话预览帧" IsChecked="True" />
@@ -63,6 +71,12 @@
           <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="模式索引" />
           <TextBox x:Name="PreferredModeBox" Grid.Column="3" Text="0" />
         </Grid>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="数据输出" FontSize="12" Padding="12,8">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,10,8,4">
+          <StackPanel Spacing="14">
 
         <TextBlock Text="输出路由（三选一）" Classes="section-title" Margin="0,8,0,0" />
         <StackPanel Orientation="Horizontal" Spacing="14">
@@ -71,7 +85,7 @@
           <RadioButton x:Name="RbOutMqtt" Content="MQTT" GroupName="Out" />
           <RadioButton x:Name="RbOutTcp" Content="TCP" GroupName="Out" />
         </StackPanel>
-        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
           <TextBlock VerticalAlignment="Center" Classes="muted" Text="键盘目标" />
           <TextBox x:Name="KeyboardTargetBox" Grid.Column="1" Text="notepad.exe" />
           <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="键盘结束键" />
@@ -106,14 +120,45 @@
           </StackPanel>
           <TextBlock Grid.Row="8" VerticalAlignment="Center" Classes="muted" Text="队列容量" />
           <TextBox x:Name="QueueCapacityBox" Grid.Row="8" Grid.Column="1" Width="120" Text="1000" />
+          <TextBlock Grid.Row="9" VerticalAlignment="Center" Classes="muted" Text="MQTT Client ID" />
+          <TextBox x:Name="MqttClientIdBox" Grid.Row="9" Grid.Column="1" />
+          <TextBlock Grid.Row="10" VerticalAlignment="Center" Classes="muted" Text="MQTT QoS" />
+          <ComboBox x:Name="MqttQosCombo" Grid.Row="10" Grid.Column="1" Width="120" HorizontalAlignment="Left">
+            <ComboBoxItem Content="0 · 至多一次" Tag="0" />
+            <ComboBoxItem Content="1 · 至少一次" Tag="1" />
+            <ComboBoxItem Content="2 · 恰好一次" Tag="2" />
+          </ComboBox>
+          <TextBlock Grid.Row="11" VerticalAlignment="Center" Classes="muted" Text="MQTT 用户名" />
+          <TextBox x:Name="MqttUsernameBox" Grid.Row="11" Grid.Column="1" />
+          <TextBlock Grid.Row="12" VerticalAlignment="Center" Classes="muted" Text="MQTT 密码" />
+          <StackPanel Grid.Row="12" Grid.Column="1" Orientation="Horizontal" Spacing="10">
+            <TextBox x:Name="MqttPasswordBox" Width="220" PasswordChar="●" PlaceholderText="留空则保持原密码" />
+            <CheckBox x:Name="ClearMqttPasswordBox" Content="清除已保存密码" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Grid.Row="13" VerticalAlignment="Center" Classes="muted" Text="MQTT TLS" />
+          <CheckBox x:Name="MqttTlsBox" Grid.Row="13" Grid.Column="1" Content="验证服务端证书" />
+          <TextBlock Grid.Row="14" VerticalAlignment="Center" Classes="muted" Text="TCP TLS" />
+          <CheckBox x:Name="TcpTlsBox" Grid.Row="14" Grid.Column="1" Content="验证服务端证书" />
+          <TextBlock Grid.Row="15" VerticalAlignment="Center" Classes="muted" Text="输出状态" />
+          <TextBlock x:Name="OutputQueueStatusText" Grid.Row="15" Grid.Column="1" Classes="muted" TextWrapping="Wrap" />
+          <StackPanel Grid.Row="16" Grid.Column="1" Orientation="Horizontal" Spacing="6">
+            <Button Classes="outline" Content="刷新状态" Click="OnRefreshOutputStatus" />
+            <Button x:Name="RetryUncertainButton" Classes="outline" Content="重试待核对…" Click="OnRetryUncertain" />
+            <Button x:Name="ResendCompletedButton" Classes="outline" Content="重发已完成…" Click="OnResendCompleted" />
+          </StackPanel>
         </Grid>
 
-        <TextBlock x:Name="TxtError" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" IsVisible="False" />
-        <TextBlock x:Name="TxtPath" Classes="muted" TextWrapping="Wrap" />
-      </StackPanel>
-    </ScrollViewer>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
 
-    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+    <StackPanel Grid.Row="1" Spacing="2" Margin="0,8,0,0">
+      <TextBlock x:Name="TxtError" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" IsVisible="False" />
+      <TextBlock x:Name="TxtPath" Classes="muted" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
       <Button Classes="outline" Content="取消" Click="OnCancel" Width="88" Height="34" />
       <Button Classes="primary" Content="保存" Click="OnSave" Width="88" Height="34" />
     </StackPanel>

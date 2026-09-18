@@ -69,8 +69,8 @@
 ## 相对私有 ScanFlow / prototype 仍缺失（留给本地 Agent）
 
 1. **视觉对等** — 对照 `F:\Projects\ScanFlow` WPF Desktop + `prototype/`：viewport chrome、ROI **拖拽编辑器**、结果 toast、状态 pill 配色和 FPS/丢帧 HUD 已补齐；后续只需按真机截图继续微调。
-2. **真机相机验证** — Linux CI 无摄像头；Windows 默认先试 MF MJPEG，无可用设备时回退 FlashCap 旧 Windows 后端（DirectShow / VfW）；仍需在真机验证 TurboJPEG → 连续 OCR → 去重 → 输出。
-3. **键盘打入业务窗口** — 验证 `SendInput` 打入记事本/业务 App；Linux `/dev/uinput` 权限与 ASCII 限制。
+2. **真机相机验证** — Windows Integrated Webcam 已验证预览与连续会话出帧；AUTOID HPA 1920×1080 MJPEG 的连续会话已在界面产生 OCR 文本结果。仍需验证 ROI、去重、键盘与网络输出端到端。
+3. **键盘打入业务窗口** — 尚未完成 `SendInput` 打入记事本/业务 App 的端到端验收；Linux `/dev/uinput` 权限与 ASCII 限制。
 4. **ROI 编辑体验** — 已支持画面内拖拽框选、区域移动、四角调整、全画面/取消/保存、Esc/Enter 快捷键；设置仍保留百分比入口。
 5. **Playlist 作为“本地图像源设备”** — 已接入连续会话，支持文件/文件夹导入、缩略图跳转及 0.5/1/2/5 秒轮播；仍需 UI 与真机验收。
 6. **UntilAbsent 等高级 HUD** — 去重模式已有；FPS/丢帧计时器、主窗口位置/尺寸/最大化记忆已补齐，仍可继续丰富 HUD 细节。

@@ -1,6 +1,9 @@
 using System.Globalization;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
 using ScanFlowOcr.App.Models;
 using ScanFlowOcr.Contracts;
 using ScanFlowOcr.Outputs;
@@ -10,16 +13,19 @@ namespace ScanFlowOcr.App;
 public partial class SettingsWindow : Window
 {
     private readonly AppSettings _draft;
+    private readonly OutputCoordinator? _coordinator;
 
     public AppSettings? Result { get; private set; }
 
     public SettingsWindow() : this(new AppSettings()) { }
 
-    public SettingsWindow(AppSettings current, string? activePath = null)
+    public SettingsWindow(AppSettings current, string? activePath = null, OutputCoordinator? coordinator = null)
     {
         InitializeComponent();
         _draft = current.Clone();
+        _coordinator = coordinator;
         LoadFromDraft();
+        RefreshOutputStatus();
         if (TxtPath is not null && !string.IsNullOrEmpty(activePath))
             TxtPath.Text = $"配置文件: {activePath}";
     }
@@ -61,8 +67,13 @@ public partial class SettingsWindow : Window
         MqttBrokerBox.Text = _draft.MqttBroker;
         MqttPortBox.Text = _draft.MqttPort.ToString(CultureInfo.InvariantCulture);
         MqttTopicBox.Text = _draft.MqttTopic;
+        MqttClientIdBox.Text = _draft.MqttClientId;
+        SelectTagged(MqttQosCombo, _draft.MqttQos.ToString(CultureInfo.InvariantCulture));
+        MqttUsernameBox.Text = _draft.MqttUsername;
+        MqttTlsBox.IsChecked = _draft.MqttTls;
         TcpHostBox.Text = _draft.TcpHost;
         TcpPortBox.Text = _draft.TcpPort.ToString(CultureInfo.InvariantCulture);
+        TcpTlsBox.IsChecked = _draft.TcpTls;
         QueueCapacityBox.Text = _draft.OutputQueueCapacity.ToString(CultureInfo.InvariantCulture);
     }
 
@@ -146,9 +157,78 @@ public partial class SettingsWindow : Window
         _draft.MqttBroker = MqttBrokerBox.Text?.Trim() ?? "localhost";
         _draft.MqttPort = ParseInt(MqttPortBox.Text, 1883);
         _draft.MqttTopic = MqttTopicBox.Text?.Trim() ?? "scanflow-ocr/scans";
+        _draft.MqttClientId = MqttClientIdBox.Text?.Trim() ?? "";
+        _draft.MqttUsername = string.IsNullOrWhiteSpace(MqttUsernameBox.Text) ? null : MqttUsernameBox.Text.Trim();
+        _draft.MqttTls = MqttTlsBox.IsChecked == true;
+        if (MqttQosCombo.SelectedItem is ComboBoxItem qosItem &&
+            int.TryParse(qosItem.Tag?.ToString(), CultureInfo.InvariantCulture, out int qos))
+            _draft.MqttQos = qos;
+        if (ClearMqttPasswordBox.IsChecked == true) _draft.MqttProtectedPassword = null;
+        else if (!string.IsNullOrEmpty(MqttPasswordBox.Text))
+            _draft.MqttProtectedPassword = MqttRoute.ProtectPassword(MqttPasswordBox.Text);
         _draft.TcpHost = TcpHostBox.Text?.Trim() ?? "127.0.0.1";
         _draft.TcpPort = ParseInt(TcpPortBox.Text, 9100);
+        _draft.TcpTls = TcpTlsBox.IsChecked == true;
         _draft.OutputQueueCapacity = ParseInt(QueueCapacityBox.Text, 1000);
+    }
+
+    private void RefreshOutputStatus()
+    {
+        if (_coordinator is null)
+        {
+            OutputQueueStatusText.Text = "输出队列未连接。";
+            RetryUncertainButton.IsEnabled = false;
+            ResendCompletedButton.IsEnabled = false;
+            return;
+        }
+        var status = _coordinator.GetStatus();
+        OutputQueueStatusText.Text = $"待发送 {status.PendingCount} · 待核对 {status.UncertainCount} · 已完成 {status.DeliveredCount}"
+            + (string.IsNullOrWhiteSpace(status.LastError) ? "" : $"\n最近错误: {status.LastError}");
+        RetryUncertainButton.IsEnabled = status.UncertainCount > 0;
+        ResendCompletedButton.IsEnabled = status.DeliveredCount > 0;
+    }
+
+    private void OnRefreshOutputStatus(object? sender, RoutedEventArgs e) => RefreshOutputStatus();
+
+    private async void OnRetryUncertain(object? sender, RoutedEventArgs e) =>
+        await ConfirmQueueActionAsync("重试待核对记录", "这些记录可能已被目标收到。确认后将再次发送，可能产生重复数据。",
+            () => _coordinator!.RetryUncertain());
+
+    private async void OnResendCompleted(object? sender, RoutedEventArgs e) =>
+        await ConfirmQueueActionAsync("重发已完成记录", "已完成的记录将重新入队并再次发送，目标可能收到重复数据。",
+            () => _coordinator!.ResendCompleted());
+
+    private async Task ConfirmQueueActionAsync(string title, string warning, Func<int> action)
+    {
+        if (_coordinator is null) return;
+        var dialog = new Window
+        {
+            Title = title, Width = 420, Height = 170, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(16), Spacing = 12,
+                Children =
+                {
+                    new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap },
+                    new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8,
+                        Children = { new Button { Content = "取消", IsCancel = true }, new Button { Content = "确认", IsDefault = true } }
+                    }
+                }
+            }
+        };
+        var buttons = ((StackPanel)((StackPanel)dialog.Content!).Children[1]).Children;
+        ((Button)buttons[0]).Click += (_, _) => dialog.Close(false);
+        ((Button)buttons[1]).Click += (_, _) => dialog.Close(true);
+        if (!await dialog.ShowDialog<bool>(this)) return;
+        try
+        {
+            int count = action();
+            RefreshOutputStatus();
+            OutputQueueStatusText.Text += $"\n已重新入队 {count} 条。";
+        }
+        catch (Exception ex) { ShowError(ex.Message); }
     }
 
     private void ShowError(string message)
