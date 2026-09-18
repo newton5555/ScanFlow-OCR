@@ -83,6 +83,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         _settingsManager = settingsManager;
         _settings = settingsManager.Current.Clone();
         InitializeComponent();
+        RestoreWindowLayout();
         PreviewScaleRoot.RenderTransform = _previewZoom;
         _coordinator = new OutputCoordinator();
         try { _coordinator.Configure(_settings.GetOutputRoutes()); } catch { /* ignore bad saved routes */ }
@@ -173,8 +174,49 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void OnClosed(object? sender, EventArgs e)
     {
+        try { await SaveWindowLayoutAsync().ConfigureAwait(false); }
+        catch { /* best-effort */ }
         try { await DisposeAsync().ConfigureAwait(false); }
         catch { /* best-effort */ }
+    }
+
+    private void RestoreWindowLayout()
+    {
+        if (double.IsFinite(_settings.WindowWidth) && _settings.WindowWidth >= MinWidth)
+            Width = Math.Clamp(_settings.WindowWidth, MinWidth, 4096);
+        if (double.IsFinite(_settings.WindowHeight) && _settings.WindowHeight >= MinHeight)
+            Height = Math.Clamp(_settings.WindowHeight, MinHeight, 4096);
+        if (_settings.WindowLeft is int left && _settings.WindowTop is int top)
+            Position = new PixelPoint(left, top);
+        if (_settings.WindowMaximized)
+            WindowState = WindowState.Maximized;
+    }
+
+    private async Task SaveWindowLayoutAsync()
+    {
+        var next = _settings.Clone();
+        if (WindowState == WindowState.Maximized)
+        {
+            next.WindowMaximized = true;
+        }
+        else
+        {
+            next.WindowMaximized = false;
+            if (Bounds.Width >= MinWidth) next.WindowWidth = Bounds.Width;
+            if (Bounds.Height >= MinHeight) next.WindowHeight = Bounds.Height;
+            next.WindowLeft = Position.X;
+            next.WindowTop = Position.Y;
+        }
+
+        if (next.WindowWidth == _settings.WindowWidth &&
+            next.WindowHeight == _settings.WindowHeight &&
+            next.WindowLeft == _settings.WindowLeft &&
+            next.WindowTop == _settings.WindowTop &&
+            next.WindowMaximized == _settings.WindowMaximized)
+            return;
+
+        await _settingsManager.SaveAsync(next).ConfigureAwait(false);
+        _settings = next;
     }
 
     public async ValueTask DisposeAsync()

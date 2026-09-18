@@ -29,6 +29,12 @@ public sealed class AppSettings
     public int PreferredCameraIndex { get; set; }
     public int PreferredModeIndex { get; set; }
 
+    public double WindowWidth { get; set; } = 1280;
+    public double WindowHeight { get; set; } = 840;
+    public int? WindowLeft { get; set; }
+    public int? WindowTop { get; set; }
+    public bool WindowMaximized { get; set; }
+
     public OcrLayout OcrLayout { get; set; } = OcrLayout.TextBlock;
     public int OcrTimeoutMs { get; set; } = 5000;
 
@@ -107,6 +113,11 @@ public sealed class AppSettings
         PreviewMaxHeight = PreviewMaxHeight,
         PreferredCameraIndex = PreferredCameraIndex,
         PreferredModeIndex = PreferredModeIndex,
+        WindowWidth = WindowWidth,
+        WindowHeight = WindowHeight,
+        WindowLeft = WindowLeft,
+        WindowTop = WindowTop,
+        WindowMaximized = WindowMaximized,
         OcrLayout = OcrLayout,
         OcrTimeoutMs = OcrTimeoutMs,
         MqttEnabled = MqttEnabled,
