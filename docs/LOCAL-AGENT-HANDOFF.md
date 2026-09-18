@@ -69,7 +69,7 @@
 ## 相对私有 ScanFlow / prototype 仍缺失（留给本地 Agent）
 
 1. **视觉对等** — 对照 `F:\Projects\ScanFlow` WPF Desktop + `prototype/`：viewport chrome、ROI **拖拽编辑器**、结果 toast、状态 pill 配色和 FPS/丢帧 HUD 已补齐；后续只需按真机截图继续微调。
-2. **真机相机验证** — Linux CI 无摄像头；请在 Windows 上验证 MF MJPEG → TurboJPEG → 连续 OCR → 去重 → 输出。
+2. **真机相机验证** — Linux CI 无摄像头；Windows 默认先试 MF MJPEG，无可用设备时回退 FlashCap 旧 Windows 后端（DirectShow / VfW）；仍需在真机验证 TurboJPEG → 连续 OCR → 去重 → 输出。
 3. **键盘打入业务窗口** — 验证 `SendInput` 打入记事本/业务 App；Linux `/dev/uinput` 权限与 ASCII 限制。
 4. **ROI 编辑体验** — 已支持画面内拖拽框选、区域移动、四角调整、全画面/取消/保存、Esc/Enter 快捷键；设置仍保留百分比入口。
 5. **Playlist 作为“本地图像源设备”** — 私有 `DesktopCameraProvider.ImportPlaylistAsync` 可进会话循环；公开版仍是静态图列表 + 手动「识别图片」。
@@ -106,6 +106,9 @@ dotnet run --project src/ScanFlowOcr.App -c Release
 - 或环境变量 `SCANFLOW_OCR_TURBOJPEG_PATH`
 - App 构建时复制到输出目录 `native/{rid}/`
 - **静态图 OCR 不需要** TurboJPEG；**相机 MJPEG / 连续扫描需要**
+
+### Windows camera backend
+默认优先 Media Foundation；若没有可用 MJPEG 描述符，会回退 FlashCap 默认 Windows 后端集合（DirectShow / Video for Windows）。诊断驱动时可设置 `SCANFLOW_OCR_CAMERA_BACKEND=mediafoundation`、`directshow` 或 `vfw`（`videoforwindows`）。
 
 ### 线程安全（相机 UI）
 相机预览与会话预览帧的 `WriteableBitmap` / `Image.Source` 更新 **必须** 在 Avalonia `Dispatcher.UIThread` 上（见 commit `316311b` 与 `CameraPreviewController` / `ConsumePreviewAsync` → `ProcessPendingPreview`）。不要在 FlashCap 回调线程直接碰 UI。

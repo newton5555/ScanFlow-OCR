@@ -7,6 +7,8 @@ namespace ScanFlowOcr.Capture.FlashCap;
 
 public sealed class FlashCapProvider : ICameraProvider
 {
+    public const string BackendEnvironmentVariable = "SCANFLOW_OCR_CAMERA_BACKEND";
+
     public string Id => "FlashCap";
     private readonly Dictionary<string, CaptureDeviceDescriptor> _devices = [];
     private readonly object _gate = new();
@@ -16,20 +18,41 @@ public sealed class FlashCapProvider : ICameraProvider
         lock (_gate)
         {
             _devices.Clear();
-            // The tested Windows DirectShow device retains native resources on every
-            // reopen. Use FlashCap's MF backend, which shuts down its media source.
-            CaptureDevices backend = OperatingSystem.IsWindowsVersionAtLeast(6, 1)
-                ? new global::FlashCap.Devices.MediaFoundationDevices()
-                : new CaptureDevices(); // Linux → V4L2 via CaptureDevices
-            foreach (var device in backend.EnumerateDescriptors())
+            foreach (var device in EnumerateUsableDescriptors())
             {
-                // First route accepts MJPEG only; unsupported modes are never advertised.
-                if (!device.Characteristics.Any(c => c.PixelFormat == PixelFormats.JPEG)) continue;
                 _devices[$"{device.DeviceType}:{device.Identity}"] = device;
             }
             return _devices.Select(p => new CameraDescriptor(new(Id, p.Key), p.Value.Name, DeviceIdentityKind.BackendId, null, null)).ToImmutableArray();
         }
     }, cancellationToken));
+
+    private static IEnumerable<CaptureDeviceDescriptor> EnumerateUsableDescriptors()
+    {
+        if (!OperatingSystem.IsWindowsVersionAtLeast(6, 1))
+            return FilterJpeg(new CaptureDevices().EnumerateDescriptors());
+
+        string? preference = Environment.GetEnvironmentVariable(BackendEnvironmentVariable)?.Trim();
+        if (string.Equals(preference, "directshow", StringComparison.OrdinalIgnoreCase))
+            return FilterJpeg(new global::FlashCap.Devices.DirectShowDevices().EnumerateDescriptors());
+        if (string.Equals(preference, "vfw", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(preference, "videoforwindows", StringComparison.OrdinalIgnoreCase))
+            return FilterJpeg(new global::FlashCap.Devices.VideoForWindowsDevices().EnumerateDescriptors());
+        if (string.Equals(preference, "mediafoundation", StringComparison.OrdinalIgnoreCase))
+            return FilterJpeg(new global::FlashCap.Devices.MediaFoundationDevices().EnumerateDescriptors());
+
+        // MF is preferred because it shuts down its media source cleanly on reopen.
+        // Some older/UVC drivers expose MJPEG through DirectShow only, so keep a
+        // compatibility fallback instead of hiding a working camera completely.
+        var mediaFoundation = FilterJpeg(new global::FlashCap.Devices.MediaFoundationDevices().EnumerateDescriptors()).ToArray();
+        if (mediaFoundation.Length > 0) return mediaFoundation;
+        // Match the legacy WPF provider's pre-MF behavior: the default FlashCap
+        // set includes DirectShow, Video for Windows, and any other compiled-in
+        // Windows backends that can expose the camera.
+        return FilterJpeg(new CaptureDevices().EnumerateDescriptors());
+    }
+
+    private static IEnumerable<CaptureDeviceDescriptor> FilterJpeg(IEnumerable<CaptureDeviceDescriptor> devices) =>
+        devices.Where(static device => device.Characteristics.Any(static c => c.PixelFormat == PixelFormats.JPEG));
     public ValueTask<ImmutableArray<CaptureMode>> GetModesAsync(CameraId device, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

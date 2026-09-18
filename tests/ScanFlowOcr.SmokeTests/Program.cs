@@ -89,7 +89,7 @@ if (args.Any(static arg => string.Equals(arg, "--camera", StringComparison.Ordin
         {
             var camera = cameras[i];
             var modes = await provider.GetModesAsync(camera.Id, CancellationToken.None);
-            Console.WriteLine($"CAMERA[{i}] {camera.DisplayName} ({modes.Length} MJPEG mode(s))");
+            Console.WriteLine($"CAMERA[{i}] {camera.DisplayName} [{camera.Id.DeviceKey}] ({modes.Length} MJPEG mode(s))");
             foreach (var mode in modes)
                 Console.WriteLine($"  MODE {mode.ModeId}: {mode.Width}x{mode.Height} @ {mode.FpsNumerator}/{Math.Max(1, mode.FpsDenominator)}");
         }

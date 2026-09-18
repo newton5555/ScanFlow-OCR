@@ -9,7 +9,7 @@ Extracted from the OCR path of private ScanFlow (barcode / DecodeP1 / Phenix / C
 | Area | Choice |
 |------|--------|
 | UI | Avalonia (Win + Linux x64) |
-| Camera | Vendored FlashCap — Windows Media Foundation, Linux V4L2; MJPEG-first |
+| Camera | Vendored FlashCap — Windows Media Foundation first with legacy backend fallback, Linux V4L2; MJPEG-first |
 | Still images | StbImageSharp + BitMiracle.LibTiff.NET (not TurboJPEG) |
 | Camera JPEG | TurboJPEG **3.2.0** via `native/{win-x64\|linux-x64}/` (or `SCANFLOW_OCR_TURBOJPEG_PATH`) |
 | OCR | In-process Sdcb.SimdPaddleOCR Chinese V6 Tiny (Small optional) |
@@ -28,7 +28,7 @@ Requires .NET SDK 10 (`global.json`).
 ```bash
 dotnet build ScanFlowOcr.slnx
 dotnet run --project tests/ScanFlowOcr.SmokeTests
-dotnet run --project tests/ScanFlowOcr.SmokeTests -- --camera  # optional Windows MF/MJPEG probe
+dotnet run --project tests/ScanFlowOcr.SmokeTests -- --camera  # optional Windows MJPEG/backend probe
 dotnet run --project src/ScanFlowOcr.App
 ```
 
@@ -38,7 +38,7 @@ Windows folder publish (keeps TurboJPEG beside the app):
 dotnet publish src/ScanFlowOcr.App -c Release -r win-x64 --self-contained false -o publish/win-x64
 ```
 
-Build succeeds on Linux **without** a camera attached. Live preview needs `/dev/video*` (Linux) or an MF camera (Windows) plus the TurboJPEG native libs (copied to output on App build).
+Build succeeds on Linux **without** a camera attached. Live preview needs `/dev/video*` (Linux) or a Windows camera exposing an MJPEG mode plus the TurboJPEG native libs (copied to output on App build).
 
 ### Native TurboJPEG (3.2.0 official binaries)
 
@@ -65,6 +65,10 @@ License: IJG + Modified BSD — see `THIRD-PARTY-NOTICES.md`. This software is b
 ### Linux camera
 
 FlashCap `CaptureDevices` selects V4L2. Process needs access to `/dev/video*`. App UI: refresh devices → pick MJPEG mode → **启动扫描** (continuous OCR session) or **仅预览** → optional OCR current frame.
+
+### Windows camera
+
+The provider prefers Media Foundation. If it exposes no MJPEG device, enumeration falls back to FlashCap's legacy Windows backend set (DirectShow / Video for Windows), which matches the older WPF behavior. To force a backend while diagnosing a driver, set `SCANFLOW_OCR_CAMERA_BACKEND=mediafoundation`, `directshow`, or `vfw` (`videoforwindows`) before starting the app.
 
 ### MQTT / TCP outputs
 
