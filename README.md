@@ -75,13 +75,14 @@ native/win-x64 native/linux-x64
 
 Phase 1 source migration is in the tree and **builds on Linux** with .NET SDK 10:
 
-- `dotnet build ScanFlowOcr.slnx` — Contracts, Imaging, Capture.FlashCap (+ vendor), Ocr.SimdPaddle, Outputs (keyboard + MQTT + TCP + coordinator), App, SmokeTests
+- Avalonia packages pinned to **12.1.2**
+- `dotnet build ScanFlowOcr.slnx -c Release` — Contracts, Imaging, Capture.FlashCap (+ vendor), Ocr.SimdPaddle, Outputs, App, SmokeTests
 - `dotnet run --project tests/ScanFlowOcr.SmokeTests` — lease / still-JPEG / keyboard+MQTT+TCP route / coordinator configure / SimdPaddle metadata checks pass
+- Avalonia App phase-1 loop: **Open image(s) → Run OCR (SimdPaddle Tiny/Small) → show text → send via Keyboard / MQTT / TCP** (`OutputCoordinator`)
 
 ### Stubbed / deferred
 
 - TurboJPEG native binaries not shipped (`native/{rid}/` placeholders; set `SCANFLOW_OCR_TURBOJPEG_PATH`)
-- Avalonia UI: camera enumerate + OCR/keyboard hooks only; no live preview/OCR pipeline UI yet
+- Camera: enumerate only (no live preview / capture→OCR pipeline UI yet)
 - Linux keyboard: ASCII (+ Tab/Enter) via `/dev/uinput`; non-ASCII returns `UnicodeUnsupported`
 - No OcrHost, clipboard, or AOT packing
-- App settings UI not yet wired to MQTT/TCP coordinator (library sinks + queue are ready)

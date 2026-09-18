@@ -12,10 +12,10 @@
     <PackageVersion Include="BitMiracle.LibTiff.NET" Version="2.4.649" />
     <PackageVersion Include="StbImageSharp" Version="2.30.15" />
     <PackageVersion Include="StbImageWriteSharp" Version="1.16.7" />
-    <PackageVersion Include="Avalonia" Version="11.3.6" />
-    <PackageVersion Include="Avalonia.Desktop" Version="11.3.6" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.3.6" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="11.3.6" />
+    <PackageVersion Include="Avalonia" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.2" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.2" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.10" />
     <PackageVersion Include="MQTTnet" Version="5.0.1.1416" />
     <PackageVersion Include="Serilog" Version="4.3.1" />

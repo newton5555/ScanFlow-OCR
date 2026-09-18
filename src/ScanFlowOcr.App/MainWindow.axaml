@@ -2,14 +2,72 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ScanFlowOcr.App.MainWindow"
         Title="ScanFlow-OCR"
-        Width="960" Height="640">
-  <DockPanel Margin="16">
-    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+        Width="1100" Height="740"
+        MinWidth="800" MinHeight="560">
+  <DockPanel Margin="12">
+    <!-- Toolbar -->
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+      <Button x:Name="OpenImagesButton" Content="Open image(s)…" Click="OnOpenImages"/>
+      <Button x:Name="RunOcrButton" Content="Run OCR" Click="OnRunOcr" IsEnabled="False"/>
       <Button Content="Enumerate cameras" Click="OnEnumerateCameras"/>
-      <Button Content="OCR (placeholder)" Click="OnOcrPlaceholder"/>
-      <Button Content="Keyboard sink info" Click="OnKeyboardInfo"/>
+      <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Text="Model:"/>
+      <ComboBox x:Name="ModelCombo" Width="110" SelectedIndex="0">
+        <ComboBoxItem Content="tiny"/>
+        <ComboBoxItem Content="small"/>
+      </ComboBox>
+      <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="16,0,0,0"
+                 Text="Ready" Opacity="0.75"/>
     </StackPanel>
-    <TextBox x:Name="Log" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap"
-             FontFamily="Consolas, monospace"/>
+
+    <!-- Output config strip -->
+    <Border DockPanel.Dock="Bottom" Margin="0,10,0,0" Padding="10"
+            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+            BorderThickness="1" CornerRadius="4">
+      <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Output sink:"/>
+          <RadioButton x:Name="SinkNone" Content="None" GroupName="Sink" IsChecked="True"/>
+          <RadioButton x:Name="SinkKeyboard" Content="Keyboard" GroupName="Sink"/>
+          <RadioButton x:Name="SinkMqtt" Content="MQTT" GroupName="Sink"/>
+          <RadioButton x:Name="SinkTcp" Content="TCP" GroupName="Sink"/>
+          <Button x:Name="ApplyOutputButton" Content="Apply output config" Click="OnApplyOutput" Margin="16,0,0,0"/>
+          <Button x:Name="SendOutputButton" Content="Send last OCR" Click="OnSendOutput" IsEnabled="False"/>
+        </StackPanel>
+        <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
+          <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Keyboard target"/>
+          <TextBox x:Name="KeyboardTarget" Grid.Row="0" Grid.Column="1" Text="notepad.exe" PlaceholderText="process / window class"/>
+          <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Text="MQTT broker"/>
+          <TextBox x:Name="MqttBroker" Grid.Row="0" Grid.Column="3" Text="localhost"/>
+          <TextBlock Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Text="MQTT port"/>
+          <TextBox x:Name="MqttPort" Grid.Row="0" Grid.Column="5" Text="1883" Width="80"/>
+          <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="MQTT topic"/>
+          <TextBox x:Name="MqttTopic" Grid.Row="1" Grid.Column="1" Text="scanflow-ocr/scans"/>
+          <TextBlock Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Text="TCP host"/>
+          <TextBox x:Name="TcpHost" Grid.Row="1" Grid.Column="3" Text="127.0.0.1"/>
+          <TextBlock Grid.Row="1" Grid.Column="4" VerticalAlignment="Center" Text="TCP port"/>
+          <TextBox x:Name="TcpPort" Grid.Row="1" Grid.Column="5" Text="9100" Width="80"/>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- Main split: files + OCR text / log -->
+    <Grid ColumnDefinitions="260,*" ColumnSpacing="12">
+      <DockPanel Grid.Column="0">
+        <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Selected images"/>
+        <ListBox x:Name="ImageList" SelectionChanged="OnImageSelectionChanged"/>
+      </DockPanel>
+      <Grid Grid.Column="1" RowDefinitions="*,160" RowSpacing="10">
+        <DockPanel Grid.Row="0">
+          <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Recognized text"/>
+          <TextBox x:Name="OcrText" AcceptsReturn="True" TextWrapping="Wrap"
+                   FontFamily="Consolas, monospace" IsReadOnly="True"/>
+        </DockPanel>
+        <DockPanel Grid.Row="1">
+          <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Log"/>
+          <TextBox x:Name="Log" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap"
+                   FontFamily="Consolas, monospace"/>
+        </DockPanel>
+      </Grid>
+    </Grid>
   </DockPanel>
 </Window>
