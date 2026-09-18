@@ -31,6 +31,12 @@ dotnet run --project tests/ScanFlowOcr.SmokeTests
 dotnet run --project src/ScanFlowOcr.App
 ```
 
+Windows folder publish (keeps TurboJPEG beside the app):
+
+```powershell
+dotnet publish src/ScanFlowOcr.App -c Release -r win-x64 --self-contained false -o publish/win-x64
+```
+
 Build succeeds on Linux **without** a camera attached. Live preview needs `/dev/video*` (Linux) or an MF camera (Windows) plus the TurboJPEG native libs (copied to output on App build).
 
 ### Native TurboJPEG (3.2.0 official binaries)
@@ -100,4 +106,4 @@ Phase 1 source migration is in the tree and **builds on Linux** with .NET SDK 10
 
 - Linux keyboard: ASCII (+ Tab/Enter) via `/dev/uinput`; non-ASCII returns `UnicodeUnsupported`
 - No OcrHost, clipboard, or AOT packing
-- Full in-viewport ROI drag editor, playlist-as-session-source, installers — see `docs/LOCAL-AGENT-HANDOFF.md`
+- Playlist-as-session-source and installers — see `docs/LOCAL-AGENT-HANDOFF.md`

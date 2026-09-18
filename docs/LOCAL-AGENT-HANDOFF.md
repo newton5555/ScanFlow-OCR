@@ -68,13 +68,13 @@
 
 ## 相对私有 ScanFlow / prototype 仍缺失（留给本地 Agent）
 
-1. **视觉对等** — 对照 `F:\Projects\ScanFlow` WPF Desktop + `prototype/`：更完整的 viewport chrome、ROI **拖拽编辑器**（私有 `MainWindow.RoiEditor.cs`）、结果 toast、状态 pill 配色、图标资源等。Avalonia 已有骨架，需像素级打磨。
+1. **视觉对等** — 对照 `F:\Projects\ScanFlow` WPF Desktop + `prototype/`：viewport chrome、ROI **拖拽编辑器**、结果 toast、状态 pill 配色和 FPS/丢帧 HUD 已补齐；后续只需按真机截图继续微调。
 2. **真机相机验证** — Linux CI 无摄像头；请在 Windows 上验证 MF MJPEG → TurboJPEG → 连续 OCR → 去重 → 输出。
 3. **键盘打入业务窗口** — 验证 `SendInput` 打入记事本/业务 App；Linux `/dev/uinput` 权限与 ASCII 限制。
-4. **ROI 编辑体验** — 当前为设置里百分比 + 叠加显示；缺画面内拖拽框选/四角调整/保存条（私有 RoiEditor）。
+4. **ROI 编辑体验** — 已支持画面内拖拽框选、区域移动、四角调整、全画面/取消/保存、Esc/Enter 快捷键；设置仍保留百分比入口。
 5. **Playlist 作为“本地图像源设备”** — 私有 `DesktopCameraProvider.ImportPlaylistAsync` 可进会话循环；公开版仍是静态图列表 + 手动「识别图片」。
-6. **UntilAbsent 等高级 HUD / FPS 计时器 / 窗口位置记忆** — 未完整移植。
-7. **打包** — 安装包 / 单文件发布 / 原生依赖随包；未做。
+6. **UntilAbsent 等高级 HUD** — 去重模式已有；FPS/丢帧计时器、主窗口位置/尺寸/最大化记忆已补齐，仍可继续丰富 HUD 细节。
+7. **打包** — Windows folder publish 已验证路径并随包复制 `native/win-x64/turbojpeg.dll`；安装包 / 单文件发布仍未做。
 8. **Clipboard** — 保持 deferred。
 
 ---

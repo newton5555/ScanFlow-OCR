@@ -22,14 +22,17 @@
   <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\native\win-x64\turbojpeg.dll" Link="native\win-x64\turbojpeg.dll" Condition="Exists('..\..\native\win-x64\turbojpeg.dll')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
     <None Include="..\..\native\linux-x64\libturbojpeg.so" Link="native\linux-x64\libturbojpeg.so" Condition="Exists('..\..\native\linux-x64\libturbojpeg.so')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </None>
   </ItemGroup>
 </Project>
