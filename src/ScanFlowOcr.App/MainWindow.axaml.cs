@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -61,6 +62,15 @@ public partial class MainWindow : Window, IAsyncDisposable
     private int _sourceWidth;
     private int _sourceHeight;
     private DispatcherTimer? _metricsTimer;
+
+    private enum RoiDragMode { None, Create, Move, NorthWest, NorthEast, SouthWest, SouthEast }
+
+    private bool _isEditingRoi;
+    private bool _roiBusy;
+    private RoiDragMode _roiDragMode;
+    private Rect _roiDraft;
+    private Rect _roiDragOrigin;
+    private Point _roiDragStart;
 
     public MainWindow() : this(new SettingsManager()) { }
 
@@ -204,6 +214,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         _lastLines = [];
         _lastStamp = null;
         SendOutputButton.IsEnabled = false;
+        LatestResultToast.IsVisible = false;
         TxtInspectorText.Text = "选择一条结果查看详情";
         TxtInspectorMeta.Text = "";
         Log.Text = "";
@@ -258,7 +269,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 {
                     Index = index++,
                     FilePath = path,
-                    FileName = Path.GetFileName(path),
+                    FileName = System.IO.Path.GetFileName(path),
                     Thumbnail = thumb
                 });
             }
@@ -298,7 +309,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             PanelPlaceholder.IsVisible = false;
             _sourceWidth = bmp.PixelSize.Width;
             _sourceHeight = bmp.PixelSize.Height;
-            UpdateOverlayGeometry();
+            UpdatePreviewSurfaceGeometry();
         }
         catch (Exception ex)
         {
@@ -551,7 +562,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             {
                 PreviewImage.Source = bmp;
                 PanelPlaceholder.IsVisible = false;
-                UpdateOverlayGeometry();
+                UpdatePreviewSurfaceGeometry();
             }
         }
         finally { lease.Dispose(); }
@@ -623,6 +634,14 @@ public partial class MainWindow : Window, IAsyncDisposable
                 SourceId = record.Frame.SourceId
             });
         }
+        if (!record.TextLines.IsDefaultOrEmpty)
+        {
+            string previewText = string.Join(" · ", record.TextLines.Take(2).Select(static line => line.Text));
+            if (previewText.Length > 140) previewText = previewText[..140] + "…";
+            TxtLatestResult.Text = previewText;
+            TxtLatestResultMeta.Text = $"{time} · {record.TextLines.Length} 行";
+            LatestResultToast.IsVisible = true;
+        }
         while (_allResults.Count > 500)
             _allResults.RemoveAt(_allResults.Count - 1);
         ApplyResultFilter();
@@ -691,7 +710,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                         PanelPlaceholder.IsVisible = false;
                         _sourceWidth = bmp.PixelSize.Width;
                         _sourceHeight = bmp.PixelSize.Height;
-                        UpdateOverlayGeometry();
+                        UpdatePreviewSurfaceGeometry();
                     }
                 },
                 () =>
@@ -729,6 +748,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             await _preview.DisposeAsync().ConfigureAwait(true);
             _preview = null;
             PreviewImage.Source = null;
+            ClearPreviewSurfaceGeometry();
             StartPreviewButton.IsEnabled = true;
             StopPreviewButton.IsEnabled = false;
             OcrFrameButton.IsEnabled = false;
@@ -887,16 +907,19 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         bool scanning = _activeSession is not null;
         bool previewing = _preview?.IsRunning ?? false;
-        RunOcrButton.IsEnabled = enabled && _playlist.Count > 0 && !scanning;
-        ModelCombo.IsEnabled = enabled && !scanning;
-        SettingsButton.IsEnabled = enabled && !scanning;
-        StartScanButton.IsEnabled = enabled && !scanning && !previewing;
-        StopScanButton.IsEnabled = enabled && scanning;
-        StartPreviewButton.IsEnabled = enabled && !scanning && !previewing;
-        StopPreviewButton.IsEnabled = enabled && previewing;
-        OcrFrameButton.IsEnabled = enabled && previewing;
-        CameraDeviceCombo.IsEnabled = enabled && !scanning && !previewing;
-        CameraModeCombo.IsEnabled = enabled && !scanning && !previewing;
+        bool roiEditing = _isEditingRoi;
+        RunOcrButton.IsEnabled = enabled && _playlist.Count > 0 && !scanning && !roiEditing;
+        ModelCombo.IsEnabled = enabled && !scanning && !roiEditing;
+        SettingsButton.IsEnabled = enabled && !scanning && !roiEditing;
+        StartScanButton.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
+        StopScanButton.IsEnabled = enabled && scanning && !roiEditing;
+        StartPreviewButton.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
+        StopPreviewButton.IsEnabled = enabled && previewing && !roiEditing;
+        OcrFrameButton.IsEnabled = enabled && previewing && !roiEditing;
+        CameraDeviceCombo.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
+        CameraModeCombo.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
+        RefreshCamerasButton.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
+        BtnEditRoi.IsEnabled = enabled && !_roiBusy && !_isEditingRoi && !scanning && _sourceWidth > 0 && _sourceHeight > 0;
         SendOutputButton.IsEnabled = enabled && !_lastLines.IsDefaultOrEmpty;
     }
 
@@ -910,6 +933,33 @@ public partial class MainWindow : Window, IAsyncDisposable
         StatusText.Text = text;
         TxtSessionState.Text = text;
         TxtHeaderSession.Text = text;
+        UpdateStatusPill(text);
+    }
+
+    private void UpdateStatusPill(string text)
+    {
+        bool fault = text.Contains("错误", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("fault", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("failed", StringComparison.OrdinalIgnoreCase);
+        bool active = text.Contains("扫描", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("running", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("preview", StringComparison.OrdinalIgnoreCase);
+        bool warning = text.Contains("警告", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("拒绝", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("暂停", StringComparison.OrdinalIgnoreCase);
+
+        string background = fault || warning ? "SurfaceSubtleBackgroundBrush" :
+            active ? "BrandSoftBrush" : "SurfaceSubtleBackgroundBrush";
+        string border = fault ? "DangerBrush" : warning ? "WarningBrush" :
+            active ? "BrandBrush" : "BorderSubtleBrush";
+        string foreground = fault ? "DangerBrush" : warning ? "WarningBrush" :
+            active ? "BrandBrush" : "TextPrimaryBrush";
+
+        PillScanStatus.Background = ResolveBrush(background, Brushes.Transparent);
+        PillScanStatus.BorderBrush = ResolveBrush(border, Brushes.Transparent);
+        DotState.Fill = ResolveBrush(border, Brushes.Gray);
+        TxtSessionState.Foreground = ResolveBrush(foreground, Brushes.White);
+        DotHeaderStatus.Fill = ResolveBrush(border, Brushes.Gray);
     }
 
     private void SetPreviewChrome(bool running, bool scanning)
@@ -968,31 +1018,353 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void UpdateRoiOverlay()
     {
-        RoiRect.IsVisible = _settings.EnableRoi;
+        RoiRect.IsVisible = _isEditingRoi || _settings.EnableRoi;
         UpdateOverlayGeometry();
+    }
+
+    private void UpdatePreviewSurfaceGeometry()
+    {
+        if (_sourceWidth <= 0 || _sourceHeight <= 0) return;
+
+        PreviewScaleRoot.Width = _sourceWidth;
+        PreviewScaleRoot.Height = _sourceHeight;
+        PreviewImage.Width = _sourceWidth;
+        PreviewImage.Height = _sourceHeight;
+        OverlayCanvas.Width = _sourceWidth;
+        OverlayCanvas.Height = _sourceHeight;
+        RoiEditorVisualCanvas.Width = _sourceWidth;
+        RoiEditorVisualCanvas.Height = _sourceHeight;
+        UpdateOverlayGeometry();
+        SetBusyUi(!_busy);
+    }
+
+    private void ClearPreviewSurfaceGeometry()
+    {
+        _sourceWidth = 0;
+        _sourceHeight = 0;
+        PreviewScaleRoot.Width = 0;
+        PreviewScaleRoot.Height = 0;
+        PreviewImage.Width = 0;
+        PreviewImage.Height = 0;
+        OverlayCanvas.Width = 0;
+        OverlayCanvas.Height = 0;
+        RoiEditorVisualCanvas.Children.Clear();
+        RoiRect.IsVisible = false;
+        SetBusyUi(!_busy);
     }
 
     private void UpdateOverlayGeometry()
     {
-        if (ViewportHost is null || OverlayCanvas is null) return;
-        double w = ViewportHost.Bounds.Width;
-        double h = ViewportHost.Bounds.Height;
-        if (w <= 1 || h <= 1) return;
+        if (_sourceWidth <= 0 || _sourceHeight <= 0) return;
 
-        OverlayCanvas.Width = w;
-        OverlayCanvas.Height = h;
-        CrosshairH.StartPoint = new Avalonia.Point(w * 0.5 - 16, h * 0.5);
-        CrosshairH.EndPoint = new Avalonia.Point(w * 0.5 + 16, h * 0.5);
-        CrosshairV.StartPoint = new Avalonia.Point(w * 0.5, h * 0.5 - 16);
-        CrosshairV.EndPoint = new Avalonia.Point(w * 0.5, h * 0.5 + 16);
+        double w = _sourceWidth;
+        double h = _sourceHeight;
+        CrosshairH.StartPoint = new Avalonia.Point(0, h * 0.5);
+        CrosshairH.EndPoint = new Avalonia.Point(w, h * 0.5);
+        CrosshairV.StartPoint = new Avalonia.Point(w * 0.5, 0);
+        CrosshairV.EndPoint = new Avalonia.Point(w * 0.5, h);
 
-        if (_settings.EnableRoi)
+        Rect roi = _isEditingRoi
+            ? _roiDraft
+            : new Rect(_settings.RoiX / 100.0, _settings.RoiY / 100.0,
+                _settings.RoiWidth / 100.0, _settings.RoiHeight / 100.0);
+        roi = ClampRoi(roi);
+        Canvas.SetLeft(RoiRect, w * roi.Left);
+        Canvas.SetTop(RoiRect, h * roi.Top);
+        RoiRect.Width = Math.Max(1, w * roi.Width);
+        RoiRect.Height = Math.Max(1, h * roi.Height);
+        UpdateRoiEditorVisuals(roi, w, h);
+    }
+
+    private void UpdateRoiEditorVisuals(Rect roi, double imageWidth, double imageHeight)
+    {
+        RoiEditorVisualCanvas.Children.Clear();
+        if (!_isEditingRoi) return;
+
+        double left = roi.Left * imageWidth;
+        double top = roi.Top * imageHeight;
+        double right = roi.Right * imageWidth;
+        double bottom = roi.Bottom * imageHeight;
+        IBrush shade = new SolidColorBrush(Color.FromArgb(112, 0, 0, 0));
+        IBrush handleBrush = ResolveBrush("BrandBrush", Brushes.DeepSkyBlue);
+
+        void AddShade(double x, double y, double width, double height)
         {
-            Canvas.SetLeft(RoiRect, w * (_settings.RoiX / 100.0));
-            Canvas.SetTop(RoiRect, h * (_settings.RoiY / 100.0));
-            RoiRect.Width = Math.Max(1, w * (_settings.RoiWidth / 100.0));
-            RoiRect.Height = Math.Max(1, h * (_settings.RoiHeight / 100.0));
+            if (width <= 0 || height <= 0) return;
+            var shape = new Rectangle
+            {
+                Width = width,
+                Height = height,
+                Fill = shade,
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(shape, x);
+            Canvas.SetTop(shape, y);
+            RoiEditorVisualCanvas.Children.Add(shape);
         }
+
+        AddShade(0, 0, imageWidth, top);
+        AddShade(0, top, left, bottom - top);
+        AddShade(right, top, imageWidth - right, bottom - top);
+        AddShade(0, bottom, imageWidth, imageHeight - bottom);
+
+        double handleSize = Math.Clamp(Math.Min(imageWidth, imageHeight) * 0.012, 8, 18);
+        foreach (var corner in new[]
+        {
+            new Point(left, top), new Point(right, top),
+            new Point(left, bottom), new Point(right, bottom)
+        })
+        {
+            var handle = new Border
+            {
+                Width = handleSize,
+                Height = handleSize,
+                Background = Brushes.White,
+                BorderBrush = handleBrush,
+                BorderThickness = new Thickness(1),
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(handle, corner.X - handleSize / 2);
+            Canvas.SetTop(handle, corner.Y - handleSize / 2);
+            RoiEditorVisualCanvas.Children.Add(handle);
+        }
+    }
+
+    private void OnBeginRoiEdit(object? sender, RoutedEventArgs e)
+    {
+        if (_isEditingRoi || _roiBusy) return;
+        if (_activeSession is not null)
+        {
+            Append("连续扫描运行中，请先停止扫描再编辑 ROI。");
+            return;
+        }
+        if (PreviewImage.Source is null || _sourceWidth <= 0 || _sourceHeight <= 0)
+        {
+            Append("请先启动预览或显示一张图片，再编辑 ROI。");
+            return;
+        }
+
+        _roiDraft = ClampRoi(new Rect(
+            _settings.RoiX / 100.0,
+            _settings.RoiY / 100.0,
+            _settings.RoiWidth / 100.0,
+            _settings.RoiHeight / 100.0));
+        _roiDragMode = RoiDragMode.None;
+        _isEditingRoi = true;
+        RoiEditorBar.IsVisible = true;
+        BtnEditRoi.IsVisible = false;
+        OverlayCanvas.IsHitTestVisible = true;
+        UpdateRoiDraftText();
+        UpdateRoiOverlay();
+        SetBusyUi(true);
+        SetStatus("编辑 ROI");
+        Append("ROI 编辑已开启：拖动空白处框选，拖动区域移动，四角调整。");
+    }
+
+    private async void OnSaveRoi(object? sender, RoutedEventArgs e)
+    {
+        if (!_isEditingRoi || _roiBusy || !IsRoiDraftValid()) return;
+        _roiBusy = true;
+        BtnRoiSave.IsEnabled = false;
+        try
+        {
+            var settings = _settings.Clone();
+            settings.EnableRoi = true;
+            settings.RoiX = _roiDraft.Left * 100;
+            settings.RoiY = _roiDraft.Top * 100;
+            settings.RoiWidth = _roiDraft.Width * 100;
+            settings.RoiHeight = _roiDraft.Height * 100;
+            if (!settings.Validate(out string? error))
+            {
+                Append(error ?? "ROI 配置无效。");
+                return;
+            }
+
+            await _settingsManager.SaveAsync(settings).ConfigureAwait(true);
+            _settings = settings.Clone();
+            try { _coordinator.Configure(_settings.GetOutputRoutes()); } catch { /* preserve saved ROI */ }
+            EndRoiEdit();
+            Append("ROI 已保存；下次启动扫描时生效。");
+            SetStatus("ROI 已保存");
+        }
+        catch (Exception ex)
+        {
+            Append($"ROI 保存失败: {ex.Message}");
+        }
+        finally
+        {
+            _roiBusy = false;
+            if (_isEditingRoi)
+            {
+                UpdateRoiDraftText();
+                BtnRoiSave.IsEnabled = IsRoiDraftValid();
+            }
+        }
+    }
+
+    private void OnCancelRoi(object? sender, RoutedEventArgs e)
+    {
+        if (!_roiBusy) EndRoiEdit();
+    }
+
+    private void OnFullRoi(object? sender, RoutedEventArgs e)
+    {
+        if (!_isEditingRoi || _roiBusy) return;
+        _roiDraft = new Rect(0, 0, 1, 1);
+        UpdateRoiDraftText();
+        UpdateOverlayGeometry();
+    }
+
+    private void EndRoiEdit()
+    {
+        if (!_isEditingRoi) return;
+        _roiDragMode = RoiDragMode.None;
+        _roiBusy = false;
+        OverlayCanvas.IsHitTestVisible = false;
+        RoiEditorBar.IsVisible = false;
+        BtnEditRoi.IsVisible = true;
+        _isEditingRoi = false;
+        UpdateRoiOverlay();
+        SetBusyUi(true);
+    }
+
+    private bool IsRoiDraftValid() =>
+        _sourceWidth > 0 && _sourceHeight > 0 &&
+        _roiDraft.Width >= 1.0 / _sourceWidth &&
+        _roiDraft.Height >= 1.0 / _sourceHeight;
+
+    private void UpdateRoiDraftText()
+    {
+        TxtRoiDraftCoordinates.Text = string.Create(CultureInfo.InvariantCulture,
+            $"X1 {_roiDraft.Left * 100:0.0}%   Y1 {_roiDraft.Top * 100:0.0}%   X2 {_roiDraft.Right * 100:0.0}%   Y2 {_roiDraft.Bottom * 100:0.0}%");
+        BtnRoiSave.IsEnabled = IsRoiDraftValid() && !_roiBusy;
+    }
+
+    private bool TryGetNormalizedPointer(PointerEventArgs e, out Point point)
+    {
+        point = default;
+        if (_sourceWidth <= 0 || _sourceHeight <= 0) return false;
+        Point local = e.GetPosition(OverlayCanvas);
+        point = new Point(
+            Math.Clamp(local.X / _sourceWidth, 0, 1),
+            Math.Clamp(local.Y / _sourceHeight, 0, 1));
+        return true;
+    }
+
+    private void OnRoiPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!_isEditingRoi || _roiBusy ||
+            e.GetCurrentPoint(OverlayCanvas).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed ||
+            !TryGetNormalizedPointer(e, out Point point)) return;
+
+        double hitX = Math.Clamp(14.0 / Math.Max(1, _sourceWidth), 0.004, 0.08);
+        double hitY = Math.Clamp(14.0 / Math.Max(1, _sourceHeight), 0.004, 0.08);
+        bool Near(double x, double y) => Math.Abs(point.X - x) <= hitX && Math.Abs(point.Y - y) <= hitY;
+
+        _roiDragStart = point;
+        _roiDragOrigin = _roiDraft;
+        _roiDragMode = Near(_roiDraft.Left, _roiDraft.Top) ? RoiDragMode.NorthWest :
+            Near(_roiDraft.Right, _roiDraft.Top) ? RoiDragMode.NorthEast :
+            Near(_roiDraft.Left, _roiDraft.Bottom) ? RoiDragMode.SouthWest :
+            Near(_roiDraft.Right, _roiDraft.Bottom) ? RoiDragMode.SouthEast :
+            _roiDraft.Contains(point) ? RoiDragMode.Move : RoiDragMode.Create;
+        e.Pointer.Capture(OverlayCanvas);
+        e.Handled = true;
+    }
+
+    private void OnRoiPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isEditingRoi || _roiBusy || _roiDragMode == RoiDragMode.None ||
+            !TryGetNormalizedPointer(e, out Point point)) return;
+
+        Rect roi = _roiDragOrigin;
+        double minW = 1.0 / Math.Max(1, _sourceWidth);
+        double minH = 1.0 / Math.Max(1, _sourceHeight);
+        switch (_roiDragMode)
+        {
+            case RoiDragMode.Create:
+                roi = new Rect(new Point(Math.Min(_roiDragStart.X, point.X), Math.Min(_roiDragStart.Y, point.Y)),
+                    new Point(Math.Max(_roiDragStart.X, point.X), Math.Max(_roiDragStart.Y, point.Y)));
+                break;
+            case RoiDragMode.Move:
+                roi = new Rect(
+                    Math.Clamp(_roiDragOrigin.X + point.X - _roiDragStart.X, 0, 1 - _roiDragOrigin.Width),
+                    Math.Clamp(_roiDragOrigin.Y + point.Y - _roiDragStart.Y, 0, 1 - _roiDragOrigin.Height),
+                    _roiDragOrigin.Width, _roiDragOrigin.Height);
+                break;
+            case RoiDragMode.NorthWest:
+                double west = Math.Clamp(point.X, 0, _roiDragOrigin.Right - minW);
+                double north = Math.Clamp(point.Y, 0, _roiDragOrigin.Bottom - minH);
+                roi = new Rect(west, north, _roiDragOrigin.Right - west, _roiDragOrigin.Bottom - north);
+                break;
+            case RoiDragMode.NorthEast:
+                double eastY = Math.Clamp(point.Y, 0, _roiDragOrigin.Bottom - minH);
+                double eastX = Math.Clamp(point.X, _roiDragOrigin.Left + minW, 1);
+                roi = new Rect(_roiDragOrigin.Left, eastY, eastX - _roiDragOrigin.Left, _roiDragOrigin.Bottom - eastY);
+                break;
+            case RoiDragMode.SouthWest:
+                double southWestX = Math.Clamp(point.X, 0, _roiDragOrigin.Right - minW);
+                double southWestY = Math.Clamp(point.Y, _roiDragOrigin.Top + minH, 1);
+                roi = new Rect(southWestX, _roiDragOrigin.Top,
+                    _roiDragOrigin.Right - southWestX, southWestY - _roiDragOrigin.Top);
+                break;
+            case RoiDragMode.SouthEast:
+                double southEastX = Math.Clamp(point.X, _roiDragOrigin.Left + minW, 1);
+                double southEastY = Math.Clamp(point.Y, _roiDragOrigin.Top + minH, 1);
+                roi = new Rect(_roiDragOrigin.Left, _roiDragOrigin.Top,
+                    southEastX - _roiDragOrigin.Left, southEastY - _roiDragOrigin.Top);
+                break;
+        }
+
+        _roiDraft = ClampRoi(roi);
+        UpdateRoiDraftText();
+        UpdateOverlayGeometry();
+        e.Handled = true;
+    }
+
+    private void OnRoiPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (!_isEditingRoi || _roiDragMode == RoiDragMode.None ||
+            e.InitialPressMouseButton != MouseButton.Left) return;
+        if (!IsRoiDraftValid()) _roiDraft = _roiDragOrigin;
+        _roiDragMode = RoiDragMode.None;
+        e.Pointer.Capture(null);
+        UpdateRoiDraftText();
+        UpdateOverlayGeometry();
+        e.Handled = true;
+    }
+
+    private void OnRoiPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (!_isEditingRoi || _roiDragMode == RoiDragMode.None) return;
+        _roiDragMode = RoiDragMode.None;
+        if (!IsRoiDraftValid()) _roiDraft = _roiDragOrigin;
+        UpdateRoiDraftText();
+        UpdateOverlayGeometry();
+    }
+
+    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!_isEditingRoi) return;
+        if (e.Key == Key.Escape)
+        {
+            EndRoiEdit();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Enter && IsRoiDraftValid())
+        {
+            OnSaveRoi(this, new RoutedEventArgs());
+            e.Handled = true;
+        }
+    }
+
+    private static Rect ClampRoi(Rect roi)
+    {
+        double left = Math.Clamp(roi.Left, 0, 1);
+        double top = Math.Clamp(roi.Top, 0, 1);
+        double right = Math.Clamp(roi.Right, left, 1);
+        double bottom = Math.Clamp(roi.Bottom, top, 1);
+        return new Rect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
     }
 
     private static IBrush ResolveBrush(string key, IBrush fallback)

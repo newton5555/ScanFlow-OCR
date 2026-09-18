@@ -6,6 +6,7 @@
         Width="1280" Height="840"
         MinWidth="980" MinHeight="640"
         WindowStartupLocation="CenterScreen"
+        KeyDown="OnWindowKeyDown"
         Background="{DynamicResource AppBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
   <Grid RowDefinitions="42,Auto,*,28">
@@ -56,7 +57,7 @@
           <ComboBox x:Name="CameraDeviceCombo" MinWidth="150" MaxWidth="220" Height="32" Margin="0,0,6,0"
                     SelectionChanged="OnCameraDeviceChanged" />
           <ComboBox x:Name="CameraModeCombo" MinWidth="140" MaxWidth="200" Height="32" Margin="0,0,6,0" />
-          <Button Classes="outline" Height="32" Margin="0,0,8,0" Content="刷新" Click="OnRefreshCameras" />
+          <Button x:Name="RefreshCamerasButton" Classes="outline" Height="32" Margin="0,0,8,0" Content="刷新" Click="OnRefreshCameras" />
           <Border Width="1" Height="20" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,8,0" />
           <Button Classes="outline" Height="32" Margin="0,0,6,0" Content="导入图片…" Click="OnOpenImages" />
           <TextBlock Text="模型:" Classes="muted" VerticalAlignment="Center" Margin="0,0,4,0" />
@@ -89,13 +90,18 @@
         <Grid RowDefinitions="*,Auto,30">
           <Grid Grid.Row="0" x:Name="ViewportHost" Background="{DynamicResource ViewportBackgroundBrush}"
                 PointerWheelChanged="OnViewportWheel" DoubleTapped="OnViewportDoubleTap">
-            <Viewbox x:Name="PreviewViewbox" Stretch="Uniform">
+            <Viewbox x:Name="PreviewViewbox" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
               <Grid x:Name="PreviewScaleRoot" RenderTransformOrigin="0.5,0.5">
-                <Image x:Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <!-- ROI overlay (percent of image bounds approximated via host) -->
-                <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False">
+                <Image x:Name="PreviewImage" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                <!-- Overlay and editor coordinates stay in source-image pixels. Viewbox only scales this surface. -->
+                <Canvas x:Name="OverlayCanvas" Background="Transparent" IsHitTestVisible="False"
+                        PointerPressed="OnRoiPointerPressed"
+                        PointerMoved="OnRoiPointerMoved"
+                        PointerReleased="OnRoiPointerReleased"
+                        PointerCaptureLost="OnRoiPointerCaptureLost">
                   <Rectangle x:Name="RoiRect" Stroke="{DynamicResource BrandBrush}" StrokeThickness="2"
                              StrokeDashArray="4,2" Fill="#22007AFF" IsVisible="False" />
+                  <Canvas x:Name="RoiEditorVisualCanvas" IsHitTestVisible="False" />
                   <!-- Crosshair -->
                   <Line x:Name="CrosshairH" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="1.2"
                         Opacity="0.85" IsVisible="True" />
@@ -126,6 +132,47 @@
                            FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
                 <TextBlock x:Name="TxtDedupeHud" Text="" FontSize="11" Classes="muted" VerticalAlignment="Center" />
               </StackPanel>
+            </Border>
+
+            <Border x:Name="LatestResultToast" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12,48,12,0"
+                    Background="{DynamicResource ViewportOverlayBackgroundBrush}"
+                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}" BorderThickness="1"
+                    CornerRadius="6" Padding="10,7" MaxWidth="360" IsVisible="False">
+              <StackPanel Spacing="3">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="OCR 接纳" FontSize="10" Classes="muted" />
+                  <TextBlock x:Name="TxtLatestResultMeta" Text="" FontSize="10" Classes="muted" />
+                </StackPanel>
+                <TextBlock x:Name="TxtLatestResult" Text="" FontSize="12" FontWeight="SemiBold"
+                           TextWrapping="Wrap" MaxWidth="330" />
+              </StackPanel>
+            </Border>
+
+            <Border x:Name="RoiEditorBar" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="12,0,12,12"
+                    Background="{DynamicResource ViewportOverlayBackgroundBrush}"
+                    BorderBrush="{DynamicResource BrandBrush}" BorderThickness="1"
+                    CornerRadius="7" Padding="10,7" IsVisible="False">
+              <StackPanel Spacing="5">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="编辑识别区域" FontSize="12" FontWeight="SemiBold" />
+                  <TextBlock Text="拖动空白处框选 · 拖动区域移动 · 四角调整" FontSize="10" Classes="muted"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock x:Name="TxtRoiDraftCoordinates" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
+                  <Button Classes="ghost" Height="26" Content="全画面" Click="OnFullRoi" />
+                  <Button Classes="ghost" Height="26" Content="取消" Click="OnCancelRoi" />
+                  <Button x:Name="BtnRoiSave" Classes="primary" Height="26" Content="保存 ROI" Click="OnSaveRoi" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12"
+                    Background="{DynamicResource ViewportOverlayBackgroundBrush}"
+                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="4">
+              <Button x:Name="BtnEditRoi" Classes="ghost" Height="24" Content="编辑 ROI"
+                      Click="OnBeginRoiEdit" ToolTip.Tip="在当前画面中拖拽框选 OCR 识别区域" />
             </Border>
 
             <!-- Zoom pill -->
