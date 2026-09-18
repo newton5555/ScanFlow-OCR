@@ -14,6 +14,23 @@ static void Check(bool ok, string name)
     Console.WriteLine("OK  " + name);
 }
 
+if (args.Contains("--keyboard-live", StringComparer.Ordinal))
+{
+    if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Windows SendInput test only.");
+    string marker = "ScanFlow-OCR 键盘输出验收 " + Guid.NewGuid().ToString("N")[..8];
+    var frame = new FrameStamp(new FrameId(Guid.NewGuid(), 1), "keyboard-live", 1, 1, Stopwatch.GetTimestamp(), null);
+    var analysis = new AnalysisId(frame.Id, 1);
+    var line = new OcrLine(marker, default, 1, null, []);
+    var record = new ScanRecord(Guid.NewGuid(), analysis, frame, DateTimeOffset.UtcNow,
+        [line], ImmutableDictionary<string, string>.Empty);
+    await using var keyboard = KeyboardOutputSink.Create(new KeyboardRoute("notepad.exe"));
+    var receipt = await keyboard.SendAsync(new OutputMessage(record, "text/plain", [], 1), CancellationToken.None);
+    Console.WriteLine($"Keyboard live receipt: {receipt.Disposition} / {receipt.Code} / {marker}");
+    Check(receipt.Disposition == DeliveryDisposition.LocallyAccepted && receipt.Code == "InputInserted",
+        "keyboard SendInput accepted by foreground Notepad");
+    return;
+}
+
 Console.WriteLine("=== ScanFlow-OCR smoke ===");
 
 var stamp = new FrameStamp(new FrameId(Guid.NewGuid(), 1), "test", 64, 64, Stopwatch.GetTimestamp(), null);
