@@ -36,12 +36,14 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private readonly ISettingsManager _settingsManager;
     private readonly OutputCoordinator _coordinator;
-    private readonly SimdPaddleOcrFactory _ocrFactory = new();
-    private readonly ImagePlaylistCameraProvider _cameraProvider = new(new FlashCapProvider());
+    private readonly SimdPaddleOcrFactory _ocrFactory;
+    private readonly ImagePlaylistCameraProvider _cameraProvider;
     private readonly PreviewBitmapRenderer _sessionPreviewRenderer = new();
     private readonly ObservableCollection<ScanResultItem> _allResults = [];
     private readonly ObservableCollection<ScanResultItem> _filteredResults = [];
     private readonly ObservableCollection<PlaylistThumbnailItem> _playlist = [];
+    private readonly ScaleTransform _viewportScale = new(1.0, 1.0);
+    private readonly TranslateTransform _viewportTranslate = new(0, 0);
     private Bitmap? _stillPreviewBitmap;
 
     private AppSettings _settings;
@@ -59,9 +61,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     private ImmutableArray<OcrLine> _lastLines = [];
     private FrameStamp? _lastStamp;
     private bool _busy;
+    private bool _suppressDeviceSelectionChanged;
+    private bool _canClose;
+    private bool _isClosing;
+    private OcrSettings? _activeOcrSettings;
     private bool _disposed;
     private double _zoomFactor = 1.0;
-    private readonly ScaleTransform _previewZoom = new(1, 1);
     private int _sourceWidth;
     private int _sourceHeight;
     private DispatcherTimer? _metricsTimer;
@@ -70,26 +75,43 @@ public partial class MainWindow : Window, IAsyncDisposable
     private long _metricLastTicks;
     private double _metricFps;
     private int _modeRequestRevision;
+    private Point _dragStartPoint;
+    private bool _isDraggingViewport;
+    private object? _hoveredAnnotation;
 
-    private enum RoiDragMode { None, Create, Move, NorthWest, NorthEast, SouthWest, SouthEast }
+    public MainWindow() : this(
+        App.Services?.GetService(typeof(ISettingsManager)) as ISettingsManager ?? new SettingsManager(),
+        App.Services?.GetService(typeof(ImagePlaylistCameraProvider)) as ImagePlaylistCameraProvider ?? new ImagePlaylistCameraProvider(new FlashCapProvider()),
+        App.Services?.GetService(typeof(SimdPaddleOcrFactory)) as SimdPaddleOcrFactory ?? new SimdPaddleOcrFactory(),
+        App.Services?.GetService(typeof(OutputCoordinator)) as OutputCoordinator ?? new OutputCoordinator())
+    {
+    }
 
-    private bool _isEditingRoi;
-    private bool _roiBusy;
-    private RoiDragMode _roiDragMode;
-    private Rect _roiDraft;
-    private Rect _roiDragOrigin;
-    private Point _roiDragStart;
+    public MainWindow(ISettingsManager settingsManager) : this(
+        settingsManager,
+        App.Services?.GetService(typeof(ImagePlaylistCameraProvider)) as ImagePlaylistCameraProvider ?? new ImagePlaylistCameraProvider(new FlashCapProvider()),
+        App.Services?.GetService(typeof(SimdPaddleOcrFactory)) as SimdPaddleOcrFactory ?? new SimdPaddleOcrFactory(),
+        App.Services?.GetService(typeof(OutputCoordinator)) as OutputCoordinator ?? new OutputCoordinator())
+    {
+    }
 
-    public MainWindow() : this(new SettingsManager()) { }
-
-    public MainWindow(ISettingsManager settingsManager)
+    internal MainWindow(
+        ISettingsManager settingsManager,
+        ImagePlaylistCameraProvider cameraProvider,
+        SimdPaddleOcrFactory ocrFactory,
+        OutputCoordinator coordinator)
     {
         _settingsManager = settingsManager;
+        _cameraProvider = cameraProvider;
+        _ocrFactory = ocrFactory;
+        _coordinator = coordinator;
         _settings = settingsManager.Current.Clone();
         InitializeComponent();
         RestoreWindowLayout();
-        PreviewScaleRoot.RenderTransform = _previewZoom;
-        _coordinator = new OutputCoordinator();
+        ViewportCanvasArea.RenderTransform = new TransformGroup
+        {
+            Children = [ _viewportScale, _viewportTranslate ]
+        };
         try { _coordinator.Configure(_settings.GetOutputRoutes()); } catch { /* ignore bad saved routes */ }
 
         ResultsList.ItemsSource = _filteredResults;
@@ -98,8 +120,8 @@ public partial class MainWindow : Window, IAsyncDisposable
 
         SyncToolbarFromSettings();
         UpdateZoomLevelText();
-        UpdateGuidesVisibility();
-        LayoutUpdated += (_, _) => UpdateOverlayGeometry();
+        UpdateThemeIcon(Application.Current?.RequestedThemeVariant == ThemeVariant.Dark);
+        UpdateCurrentSourceCard();
 
         Append("ScanFlow-OCR — continuous OCR session + still images + MJPEG preview.");
         Append($"Settings: {_settingsManager.ActiveFilePath}");
@@ -108,9 +130,59 @@ public partial class MainWindow : Window, IAsyncDisposable
         else
             Append($"TurboJPEG missing (camera needs it): {tjErr}");
 
+        Closing += MainWindow_Closing;
         Closed += OnClosed;
+
+        if (OperatingSystem.IsLinux())
+        {
+            WindowDecorations = Avalonia.Controls.WindowDecorations.Full;
+            PanelCaptionButtons.IsVisible = false;
+            CaptionDivider.IsVisible = false;
+        }
+
+        PropertyChanged += (s, e) =>
+        {
+            if (e.Property == WindowStateProperty && PathMaximizeIcon is not null && Application.Current is not null)
+            {
+                PathMaximizeIcon.Data = WindowState == WindowState.Maximized
+                    ? (StreamGeometry)Application.Current.FindResource("GeoWindowRestore")!
+                    : (StreamGeometry)Application.Current.FindResource("GeoWindowMaximize")!;
+                ToolTip.SetTip(BtnMaximizeRestoreWindow, WindowState == WindowState.Maximized ? "向下还原" : "最大化");
+            }
+        };
+
         _ = RefreshCamerasAsync();
         StartMetricsTimer();
+    }
+
+    private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            if (e.ClickCount == 2)
+            {
+                WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            }
+            else
+            {
+                BeginMoveDrag(e);
+            }
+        }
+    }
+
+    private void OnMinimizeWindowClick(object? sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState.Minimized;
+    }
+
+    private void OnMaximizeRestoreWindowClick(object? sender, RoutedEventArgs e)
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+    }
+
+    private void OnCloseWindowClick(object? sender, RoutedEventArgs e)
+    {
+        Close();
     }
 
     private void StartMetricsTimer()
@@ -131,6 +203,15 @@ public partial class MainWindow : Window, IAsyncDisposable
             TxtPreviewMetrics.Text = _sourceWidth > 0
                 ? $"{_sourceWidth}×{_sourceHeight} · {fps:0.0} FPS"
                 : "会话预览中";
+
+            if (TxtFpsHud is not null)
+            {
+                TxtFpsHud.Text = $"{fps:0.0} FPS";
+                TxtFpsHud.IsVisible = true;
+                TxtHudSeparator.IsVisible = true;
+                TxtHudTitle.Text = "实时画面";
+                DotHudLive.Fill = ResolveBrush("SuccessBrush", Brushes.LimeGreen);
+            }
             return;
         }
 
@@ -142,6 +223,15 @@ public partial class MainWindow : Window, IAsyncDisposable
             TxtPreviewMetrics.Text = _sourceWidth > 0
                 ? $"{_sourceWidth}×{_sourceHeight} · {fps:0.0} FPS"
                 : "预览中";
+
+            if (TxtFpsHud is not null)
+            {
+                TxtFpsHud.Text = $"{fps:0.0} FPS";
+                TxtFpsHud.IsVisible = true;
+                TxtHudSeparator.IsVisible = true;
+                TxtHudTitle.Text = "实时画面";
+                DotHudLive.Fill = ResolveBrush("SuccessBrush", Brushes.LimeGreen);
+            }
             return;
         }
 
@@ -150,6 +240,22 @@ public partial class MainWindow : Window, IAsyncDisposable
         TxtPreviewMetrics.Text = PreviewImage.Source is not null && _sourceWidth > 0
             ? $"静态图 {_sourceWidth}×{_sourceHeight}"
             : "未启用";
+
+        if (TxtFpsHud is not null)
+        {
+            TxtFpsHud.IsVisible = false;
+            TxtHudSeparator.IsVisible = false;
+            if (PreviewImage.Source is not null)
+            {
+                TxtHudTitle.Text = "图像预览";
+                DotHudLive.Fill = ResolveBrush("BrandBrush", Brushes.DodgerBlue);
+            }
+            else
+            {
+                TxtHudTitle.Text = "取景就绪";
+                DotHudLive.Fill = ResolveBrush("TextMutedBrush", Brushes.Gray);
+            }
+        }
     }
 
     private double UpdateMetricRate(string source, long count)
@@ -176,6 +282,71 @@ public partial class MainWindow : Window, IAsyncDisposable
             _metricFps = _metricFps <= 0 ? instant : (_metricFps * 0.65) + (instant * 0.35);
         }
         return _metricFps;
+    }
+
+    private void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
+    {
+        if (_canClose) return;
+
+        var outputStatus = _coordinator.GetStatus();
+        if (outputStatus is { PendingCount: > 0 })
+        {
+            e.Cancel = true;
+            if (_isClosing) return;
+            _isClosing = true;
+            _ = PromptPendingOutputOnCloseAsync(outputStatus.PendingCount);
+            return;
+        }
+    }
+
+    private async Task PromptPendingOutputOnCloseAsync(int pendingCount)
+    {
+        var dialog = new Window
+        {
+            Title = "待发送记录",
+            Width = 380,
+            Height = 160,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        var panel = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
+        panel.Children.Add(new TextBlock
+        {
+            Text = $"仍有 {pendingCount} 条输出任务未完成。\n退出后任务保留，下次启动继续发送。是否退出？",
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 13
+        });
+        var buttons = new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Spacing = 10
+        };
+        var btnCancel = new Button { Content = "取消", Width = 70, Height = 28 };
+        var btnOk = new Button { Content = "退出", Width = 70, Height = 28, Classes = { "danger" } };
+        buttons.Children.Add(btnCancel);
+        buttons.Children.Add(btnOk);
+        panel.Children.Add(buttons);
+        dialog.Content = panel;
+
+        btnCancel.Click += (_, _) => dialog.Close(false);
+        btnOk.Click += (_, _) => dialog.Close(true);
+
+        bool confirmed = await dialog.ShowDialog<bool>(this).ConfigureAwait(true);
+        if (confirmed)
+        {
+            _canClose = true;
+            if (_activeSession != null)
+            {
+                try { await StopScanningAsync().ConfigureAwait(true); }
+                catch { }
+            }
+            Close();
+        }
+        else
+        {
+            _isClosing = false;
+        }
     }
 
     private async void OnClosed(object? sender, EventArgs e)
@@ -276,27 +447,55 @@ public partial class MainWindow : Window, IAsyncDisposable
         MqttTopic.Text = _settings.MqttTopic;
         TcpHost.Text = _settings.TcpHost;
         TcpPort.Text = _settings.TcpPort.ToString(CultureInfo.InvariantCulture);
-        TxtDedupeHud.Text = $"去重:{_settings.DedupeMode}";
-        UpdateGuidesVisibility();
-        UpdateRoiOverlay();
+        RedrawOverlay();
     }
 
-    private async void OnOpenSettings(object? sender, RoutedEventArgs e)
+    private async Task OpenSettingsDialogAsync(bool selectCameraTab = false, bool selectOutputTab = false)
     {
         if (_activeSession is not null)
         {
             Append("扫描运行中已锁定设置，请先停止。");
             return;
         }
-        var win = new SettingsWindow(_settings, _settingsManager.ActiveFilePath, _coordinator);
+        int currentDeviceIdx = CameraDeviceCombo.SelectedIndex;
+        int currentModeIdx = CameraModeCombo.SelectedIndex;
+        var win = new SettingsWindow(
+            _settings,
+            _settingsManager.ActiveFilePath,
+            _coordinator,
+            _cameras,
+            _cameraProvider,
+            currentDeviceIdx,
+            currentModeIdx);
+
+        if (selectCameraTab)
+        {
+            win.SelectCameraTab();
+        }
+        else if (selectOutputTab)
+        {
+            win.SelectOutputTab();
+        }
         var result = await win.ShowDialog<AppSettings?>(this).ConfigureAwait(true);
         if (result is null) return;
         await _settingsManager.SaveAsync(result).ConfigureAwait(true);
         _settings = result.Clone();
         try { _coordinator.Configure(_settings.GetOutputRoutes()); } catch (Exception ex) { Append($"输出配置: {ex.Message}"); }
         SyncToolbarFromSettings();
-        Append("设置已保存。");
+
+        await SelectDeviceAndModeAsync(
+            win.SelectedDevice,
+            win.SelectedMode,
+            _settings.PreferredCameraIndex,
+            _settings.PreferredModeIndex).ConfigureAwait(true);
+
+        Append($"设置已保存至 {System.IO.Path.GetFileName(_settingsManager.ActiveFilePath)}。");
         SetStatus("设置已更新");
+    }
+
+    private async void OnOpenSettings(object? sender, RoutedEventArgs e)
+    {
+        await OpenSettingsDialogAsync(false).ConfigureAwait(true);
     }
 
     private void OnToggleTheme(object? sender, RoutedEventArgs e)
@@ -305,7 +504,118 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (app is null) return;
         bool toDark = app.RequestedThemeVariant != ThemeVariant.Dark;
         app.RequestedThemeVariant = toDark ? ThemeVariant.Dark : ThemeVariant.Light;
-        ThemeToggleGlyph.Text = toDark ? "☾" : "☀";
+        UpdateThemeIcon(toDark);
+    }
+
+    private void UpdateThemeIcon(bool isDark)
+    {
+        if (this.TryFindResource(isDark ? "GeoMoon" : "GeoSun", out object? geo) && geo is Geometry g)
+        {
+            PathThemeIcon.Data = g;
+        }
+    }
+
+    private void UpdateCurrentSourceCard()
+    {
+        int index = CameraDeviceCombo.SelectedIndex;
+        if (index >= 0 && index < _cameras.Length)
+        {
+            var device = _cameras[index];
+            TxtCurrentSourceName.Text = device.DisplayName;
+            string? modeText = CameraModeCombo.SelectedItem?.ToString();
+            TxtCurrentSourceMode.Text = !string.IsNullOrEmpty(modeText) ? modeText : "-";
+        }
+        else
+        {
+            TxtCurrentSourceName.Text = "未选择设备";
+            TxtCurrentSourceMode.Text = "-";
+        }
+    }
+
+    private async void OnCurrentSourceCardClick(object? sender, RoutedEventArgs e)
+    {
+        await OpenSettingsDialogAsync(true).ConfigureAwait(true);
+    }
+
+    private bool _isDrawerExpanded = true;
+    private void OnToggleDrawer(object? sender, RoutedEventArgs e)
+    {
+        _isDrawerExpanded = !_isDrawerExpanded;
+        DrawerBody.IsVisible = _isDrawerExpanded;
+        if (this.TryFindResource(_isDrawerExpanded ? "GeoChevronDown" : "GeoChevronRight", out object? geo) && geo is Geometry g)
+        {
+            PathDrawerChevron.Data = g;
+        }
+    }
+
+    private int _logLinesCount;
+    private bool _isLogDrawerExpanded;
+
+    private void OnToggleLogDrawer(object? sender, RoutedEventArgs e)
+    {
+        _isLogDrawerExpanded = !_isLogDrawerExpanded;
+        LogDrawerBody.IsVisible = _isLogDrawerExpanded;
+        if (this.TryFindResource(_isLogDrawerExpanded ? "GeoChevronDown" : "GeoChevronUp", out object? geo) && geo is Geometry g)
+        {
+            PathLogDrawerChevron.Data = g;
+        }
+    }
+
+    private async void OnCopyLog(object? sender, RoutedEventArgs e)
+    {
+        if (Clipboard is not null && !string.IsNullOrEmpty(Log.Text))
+        {
+            await Clipboard.SetTextAsync(Log.Text);
+            SetStatus("已复制运行日志");
+        }
+    }
+
+    private void OnClearLog(object? sender, RoutedEventArgs e)
+    {
+        Log.Text = "";
+        _logLinesCount = 0;
+        TxtLogLineCount.Text = "0 行";
+        SetStatus("已清空运行日志");
+    }
+
+    private async void OnCopyResultItem(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: ScanResultItem item } && Clipboard is not null && !string.IsNullOrEmpty(item.Text))
+        {
+            await Clipboard.SetTextAsync(item.Text);
+            SetStatus($"已复制: {item.Text}");
+        }
+    }
+
+    private void ShowBanner(string text)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => ShowBanner(text));
+            return;
+        }
+        TxtBannerMessage.Text = text;
+        BannerNotice.IsVisible = !string.IsNullOrWhiteSpace(text);
+    }
+
+    private void OnDismissBanner(object? sender, RoutedEventArgs e)
+    {
+        BannerNotice.IsVisible = false;
+    }
+
+    private async void OnCopyBanner(object? sender, RoutedEventArgs e)
+    {
+        if (Clipboard is not null && !string.IsNullOrEmpty(TxtBannerMessage.Text))
+        {
+            await Clipboard.SetTextAsync(TxtBannerMessage.Text);
+            SetStatus("已复制错误信息");
+        }
+    }
+
+    private void OnToggleAdvancedToolbar(object? sender, RoutedEventArgs e)
+    {
+        AdvancedToolbar.IsVisible = !AdvancedToolbar.IsVisible;
+        AdvancedToolbarButton.Content = AdvancedToolbar.IsVisible ? "收起控制⌃" : "更多控制⌄";
     }
 
     private void OnClearResults(object? sender, RoutedEventArgs e)
@@ -315,10 +625,12 @@ public partial class MainWindow : Window, IAsyncDisposable
         _lastLines = [];
         _lastStamp = null;
         SendOutputButton.IsEnabled = false;
-        LatestResultToast.IsVisible = false;
+        SyncFrameAnnotations();
         TxtInspectorText.Text = "选择一条结果查看详情";
         TxtInspectorMeta.Text = "";
         Log.Text = "";
+        _logLinesCount = 0;
+        TxtLogLineCount.Text = "0 行";
         SetStatus("已清空结果");
     }
 
@@ -421,7 +733,10 @@ public partial class MainWindow : Window, IAsyncDisposable
                 int deviceIndex = -1;
                 for (int i = 0; i < _cameras.Length; i++)
                     if (_cameras[i].Id == imported.Id) { deviceIndex = i; break; }
-                if (deviceIndex >= 0) CameraDeviceCombo.SelectedIndex = deviceIndex;
+                if (deviceIndex >= 0)
+                {
+                    await SelectDeviceAndModeAsync(_cameras[deviceIndex], null, deviceIndex, 0).ConfigureAwait(true);
+                }
                 foreach (var p in _playlist) p.IsActive = false;
                 _playlist[0].IsActive = true;
                 await ShowStillPreviewAsync(_playlist[0].FilePath).ConfigureAwait(true);
@@ -437,6 +752,58 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
     }
 
+    private void OnClearPlaylist(object? sender, RoutedEventArgs e)
+    {
+        OnClearImportedAndRefresh(sender, e);
+    }
+
+    private void OnPlaylistScrollLeft(object? sender, RoutedEventArgs e)
+    {
+        if (DrawerBody is not null)
+        {
+            DrawerBody.Offset = new Avalonia.Vector(Math.Max(0, DrawerBody.Offset.X - 140), DrawerBody.Offset.Y);
+        }
+    }
+
+    private void OnPlaylistScrollRight(object? sender, RoutedEventArgs e)
+    {
+        if (DrawerBody is not null)
+        {
+            DrawerBody.Offset = new Avalonia.Vector(DrawerBody.Offset.X + 140, DrawerBody.Offset.Y);
+        }
+    }
+
+    private async void OnClearImportedAndRefresh(object? sender, RoutedEventArgs e)
+    {
+        if (_activeSession != null)
+        {
+            Append("请先停止当前扫描再刷新设备。");
+            return;
+        }
+
+        _cameraProvider.ClearImportedImages();
+        foreach (var item in _playlist)
+            item.Thumbnail?.Dispose();
+        _playlist.Clear();
+
+        if (DrawerPlaylist is not null)
+            DrawerPlaylist.IsVisible = false;
+
+        TxtImageCount.Text = "0 张";
+        _lastLines = [];
+        SyncFrameAnnotations();
+        PreviewImage.Source = null;
+        _stillPreviewBitmap?.Dispose();
+        _stillPreviewBitmap = null;
+        PanelPlaceholder.IsVisible = true;
+
+        SetHeaderSessionStatus("服务已就绪", active: false);
+        SetPipelineStatus("取景就绪", active: false);
+        SetStatus("已清空导入的图片，正在刷新硬件设备...");
+        Append("已清空导入的图片并刷新输入源。");
+        await RefreshCamerasAsync().ConfigureAwait(true);
+    }
+
     private async void OnPlaylistItemPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Border border || border.Tag is not PlaylistThumbnailItem item) return;
@@ -444,7 +811,11 @@ public partial class MainWindow : Window, IAsyncDisposable
         item.IsActive = true;
         _cameraProvider.SetStartIndex(item.Index);
         if (_activeSession is null && _preview is null)
+        {
+            _lastLines = [];
+            SyncFrameAnnotations();
             await ShowStillPreviewAsync(item.FilePath).ConfigureAwait(true);
+        }
         if (e.ClickCount >= 2)
             OnRunOcr(sender, new RoutedEventArgs());
     }
@@ -486,10 +857,32 @@ public partial class MainWindow : Window, IAsyncDisposable
         string model = GetSelectedModel();
         await RunExclusiveAsync(async () =>
         {
+            SetPipelineStatus("单图识别中", active: true);
             SetStatus($"OCR ({model})…");
             StillImageBgra bgra = await Task.Run(() => StillImages.DecodeBgra(active.FilePath)).ConfigureAwait(true);
-            byte[] bgr = StillImages.CopyToBgr(bgra.Pixels, bgra.Width, bgra.Height);
-            await RunOcrOnBgrAsync(bgr, bgra.Width, bgra.Height, model, "still:" + active.FileName).ConfigureAwait(true);
+            int w = bgra.Width;
+            int h = bgra.Height;
+            int cropX = 0, cropY = 0;
+            int ow = w, oh = h;
+            byte[] bgr;
+
+            if (_settings.EnableRoi)
+            {
+                cropX = (int)Math.Clamp(Math.Round(w * (_settings.RoiX / 100.0)), 0, Math.Max(0, w - 1));
+                cropY = (int)Math.Clamp(Math.Round(h * (_settings.RoiY / 100.0)), 0, Math.Max(0, h - 1));
+                ow = (int)Math.Clamp(Math.Round(w * (_settings.RoiWidth / 100.0)), 1, Math.Max(1, w - cropX));
+                oh = (int)Math.Clamp(Math.Round(h * (_settings.RoiHeight / 100.0)), 1, Math.Max(1, h - cropY));
+                byte[] cropped = new byte[ow * oh * 4];
+                for (int row = 0; row < oh; row++)
+                    Buffer.BlockCopy(bgra.Pixels, ((cropY + row) * w + cropX) * 4, cropped, row * ow * 4, ow * 4);
+                bgr = StillImages.CopyToBgr(cropped, ow, oh);
+            }
+            else
+            {
+                bgr = StillImages.CopyToBgr(bgra.Pixels, w, h);
+            }
+
+            await RunOcrOnBgrAsync(bgr, ow, oh, model, "still:" + active.FileName, fullWidth: w, fullHeight: h, offsetX: cropX, offsetY: cropY).ConfigureAwait(true);
         }).ConfigureAwait(true);
     }
 
@@ -505,10 +898,27 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             SetCameraError("");
             _cameras = await _cameraProvider.EnumerateAsync(CancellationToken.None).ConfigureAwait(true);
-            CameraDeviceCombo.ItemsSource = _cameras.Select(c => c.DisplayName).ToList();
-            int prefer = Math.Clamp(_settings.PreferredCameraIndex, 0, Math.Max(0, _cameras.Length - 1));
-            if (_cameras.Length > 0) CameraDeviceCombo.SelectedIndex = prefer;
-            else CameraModeCombo.ItemsSource = null;
+            _suppressDeviceSelectionChanged = true;
+            try
+            {
+                CameraDeviceCombo.ItemsSource = _cameras.Select(c => c.DisplayName).ToList();
+            }
+            finally
+            {
+                _suppressDeviceSelectionChanged = false;
+            }
+
+            if (_cameras.Length > 0)
+            {
+                int prefer = Math.Clamp(_settings.PreferredCameraIndex, 0, _cameras.Length - 1);
+                await SelectDeviceAndModeAsync(_cameras[prefer], null, prefer, _settings.PreferredModeIndex).ConfigureAwait(true);
+            }
+            else
+            {
+                CameraModeCombo.ItemsSource = null;
+                UpdateCurrentSourceCard();
+            }
+
             Append($"输入源: {_cameras.Length} 个（相机 / 图片）。");
             SetStatus(_cameras.Length == 0 ? "未找到输入源" : $"已就绪 · {_cameras.Length} 个输入源");
         }
@@ -521,25 +931,148 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async void OnCameraDeviceChanged(object? sender, SelectionChangedEventArgs e)
     {
-        int revision = ++_modeRequestRevision;
+        if (_suppressDeviceSelectionChanged) return;
         int index = CameraDeviceCombo.SelectedIndex;
         if (index < 0 || index >= _cameras.Length) { CameraModeCombo.ItemsSource = null; return; }
+        await SelectDeviceAndModeAsync(_cameras[index], null, index, _settings.PreferredModeIndex).ConfigureAwait(true);
+    }
+
+    private void OnCameraModeChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressDeviceSelectionChanged) return;
+        UpdateCurrentSourceCard();
+    }
+
+    private async Task SelectDeviceAndModeAsync(
+        CameraDescriptor? targetDevice,
+        CaptureMode? targetMode,
+        int preferredDeviceIndex = -1,
+        int preferredModeIndex = -1)
+    {
+        if (_cameras.IsDefaultOrEmpty)
+        {
+            UpdateCurrentSourceCard();
+            return;
+        }
+
+        int targetDeviceIndex = -1;
+        if (targetDevice != null)
+        {
+            for (int i = 0; i < _cameras.Length; i++)
+            {
+                if (_cameras[i].Id == targetDevice.Id)
+                {
+                    targetDeviceIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (targetDeviceIndex < 0 && preferredDeviceIndex >= 0 && preferredDeviceIndex < _cameras.Length)
+        {
+            targetDeviceIndex = preferredDeviceIndex;
+        }
+
+        if (targetDeviceIndex < 0)
+        {
+            targetDeviceIndex = 0;
+        }
+
+        int revision = ++_modeRequestRevision;
+        _suppressDeviceSelectionChanged = true;
         try
         {
-            var device = _cameras[index];
+            CameraDeviceCombo.SelectedIndex = targetDeviceIndex;
+        }
+        finally
+        {
+            _suppressDeviceSelectionChanged = false;
+        }
+
+        var device = _cameras[targetDeviceIndex];
+
+        bool isImage = ImagePlaylistCameraProvider.IsImageDevice(device.Id);
+        if (DrawerPlaylist is not null)
+        {
+            DrawerPlaylist.IsVisible = isImage && _playlist.Count > 0;
+        }
+
+        if (!isImage && _activeSession is null)
+        {
+            PreviewImage.Source = null;
+            _stillPreviewBitmap?.Dispose();
+            _stillPreviewBitmap = null;
+            PanelPlaceholder.IsVisible = true;
+            _lastLines = [];
+            SyncFrameAnnotations();
+        }
+        else if (isImage && _activeSession is null && _playlist.Count > 0)
+        {
+            var active = _playlist.FirstOrDefault(p => p.IsActive) ?? _playlist[0];
+            await ShowStillPreviewAsync(active.FilePath).ConfigureAwait(true);
+        }
+
+        try
+        {
             var modes = await _cameraProvider.GetModesAsync(device.Id, CancellationToken.None).ConfigureAwait(true);
-            if (revision != _modeRequestRevision || CameraDeviceCombo.SelectedIndex != index) return;
-            CameraModeCombo.ItemsSource = modes.Select(m =>
-                ImagePlaylistCameraProvider.IsImageDevice(device.Id)
-                    ? $"{m.Width}×{m.Height} · {m.FpsDenominator} ms/张"
-                    : $"{m.Width}×{m.Height} @ {m.FpsNumerator}/{Math.Max(1, m.FpsDenominator)} · {(m.Encoding == FrameEncoding.Jpeg ? "MJPEG" : "RGB24/32")}").ToList();
-            CameraModeCombo.Tag = modes;
-            int prefer = Math.Clamp(_settings.PreferredModeIndex, 0, Math.Max(0, modes.Length - 1));
-            if (modes.Length > 0) CameraModeCombo.SelectedIndex = prefer;
+            if (revision != _modeRequestRevision || CameraDeviceCombo.SelectedIndex != targetDeviceIndex) return;
+
+            _suppressDeviceSelectionChanged = true;
+            try
+            {
+                CameraModeCombo.ItemsSource = modes.Select(m =>
+                    isImage
+                        ? $"{m.Width}×{m.Height} · {m.FpsDenominator} ms/张"
+                        : $"{m.Width}×{m.Height} @ {m.FpsNumerator}/{Math.Max(1, m.FpsDenominator)} · {(m.Encoding == FrameEncoding.Jpeg ? "MJPEG" : "RGB24/32")}").ToList();
+                CameraModeCombo.Tag = modes;
+
+                int targetModeIndex = -1;
+                if (targetMode != null)
+                {
+                    for (int i = 0; i < modes.Length; i++)
+                    {
+                        if (modes[i].Width == targetMode.Width &&
+                            modes[i].Height == targetMode.Height &&
+                            modes[i].Encoding == targetMode.Encoding &&
+                            modes[i].FpsNumerator == targetMode.FpsNumerator &&
+                            modes[i].FpsDenominator == targetMode.FpsDenominator)
+                        {
+                            targetModeIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (targetModeIndex < 0 && preferredModeIndex >= 0 && preferredModeIndex < modes.Length)
+                {
+                    targetModeIndex = preferredModeIndex;
+                }
+
+                if (targetModeIndex < 0)
+                {
+                    targetModeIndex = Math.Clamp(_settings.PreferredModeIndex, 0, Math.Max(0, modes.Length - 1));
+                }
+
+                if (modes.Length > 0)
+                {
+                    CameraModeCombo.SelectedIndex = targetModeIndex;
+                }
+            }
+            finally
+            {
+                _suppressDeviceSelectionChanged = false;
+            }
+
+            SetStatus($"已就绪 · {device.DisplayName} ({modes.Length} 种可用模式)");
         }
         catch (Exception ex)
         {
-            Append($"GetModes failed: {ex.Message}");
+            Append($"获取工作模式失败: {ex.Message}");
+            SetCameraError(ex.Message);
+        }
+        finally
+        {
+            UpdateCurrentSourceCard();
         }
     }
 
@@ -621,7 +1154,9 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
 
         StartScanButton.IsEnabled = false;
+        StartScanButton.IsVisible = false;
         StopScanButton.IsEnabled = true;
+        StopScanButton.IsVisible = true;
         StartPreviewButton.IsEnabled = false;
         StopPreviewButton.IsEnabled = false;
         OcrFrameButton.IsEnabled = false;
@@ -629,7 +1164,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         CameraDeviceCombo.IsEnabled = false;
         CameraModeCombo.IsEnabled = false;
         SetPreviewChrome(true, scanning: true);
-        TxtDedupeHud.Text = $"去重:{_settings.DedupeMode}";
+        SetHeaderSessionStatus("连续会话运行中", active: true);
+        SetPipelineStatus("连续扫描中", active: true);
         SetStatus("正在扫描");
         Append($"连续扫描已启动: {_cameras[di].DisplayName} {modes[mi].Width}×{modes[mi].Height}");
     }
@@ -676,12 +1212,16 @@ public partial class MainWindow : Window, IAsyncDisposable
         Interlocked.Exchange(ref _previewUpdateScheduled, 0);
 
         StartScanButton.IsEnabled = true;
+        StartScanButton.IsVisible = true;
         StopScanButton.IsEnabled = false;
+        StopScanButton.IsVisible = false;
         StartPreviewButton.IsEnabled = true;
         SettingsButton.IsEnabled = true;
         CameraDeviceCombo.IsEnabled = true;
         CameraModeCombo.IsEnabled = true;
         SetPreviewChrome(false, scanning: false);
+        SetHeaderSessionStatus("服务已就绪", active: false);
+        SetPipelineStatus("取景就绪", active: false);
         SetStatus("已停止");
         Append("连续扫描已停止。");
     }
@@ -812,17 +1352,10 @@ public partial class MainWindow : Window, IAsyncDisposable
                 SourceId = record.Frame.SourceId
             });
         }
-        if (!record.TextLines.IsDefaultOrEmpty)
-        {
-            string previewText = string.Join(" · ", record.TextLines.Take(2).Select(static line => line.Text));
-            if (previewText.Length > 140) previewText = previewText[..140] + "…";
-            TxtLatestResult.Text = previewText;
-            TxtLatestResultMeta.Text = $"{time} · {record.TextLines.Length} 行";
-            LatestResultToast.IsVisible = true;
-        }
         while (_allResults.Count > 500)
             _allResults.RemoveAt(_allResults.Count - 1);
         ApplyResultFilter();
+        SyncFrameAnnotations();
         Append($"OCR 接纳 {record.TextLines.Length} 行 EventId={record.EventId:N}");
     }
 
@@ -866,20 +1399,81 @@ public partial class MainWindow : Window, IAsyncDisposable
         catch (Exception ex) { Append($"复制失败: {ex.Message}"); }
     }
 
-    private void RefreshOutputQueueStatus()
+    private void RefreshOutputQueueStatus() => UpdateOutputStatusIndicator();
+
+    private void UpdateOutputStatusIndicator()
     {
+        if (TxtOutputSinkName is null) return;
         var status = _coordinator.GetStatus();
-        string sink = status.Routes.FirstOrDefault(static route => route.Enabled)?.SinkId switch
+        if (status is null || !status.Enabled)
         {
-            "mqtt" => "MQTT",
-            "tcp" => "TCP",
-            "keyboard" => "键盘",
-            _ => "输出未启用"
-        };
-        TxtOutputQueueStatus.Text = status.Enabled
-            ? $"{sink} · 待发 {status.PendingCount} · 待核对 {status.UncertainCount}"
-            : sink;
-        BtnClearOutputQueue.IsEnabled = status.PendingCount + status.UncertainCount > 0;
+            if (this.TryFindResource("TextMutedBrush", out object? mutedBrush) && mutedBrush is IBrush mb)
+            {
+                DotOutputStatus.Fill = mb;
+                TxtOutputSinkName.Foreground = mb;
+            }
+            TxtOutputSinkName.Text = "输出未启用";
+            TxtOutputPendingCount.Text = "";
+            BtnClearOutputQueue.IsEnabled = false;
+            BtnClearOutputQueue.IsVisible = false;
+            ToolTip.SetTip(BtnOutputStatusPill, "外部数据推送未启用。点击打开【数据输出】设置");
+            return;
+        }
+
+        string sinkName = "外部输出";
+        if (status.Routes.Length > 0)
+        {
+            var r = status.Routes.FirstOrDefault(static route => route.Enabled) ?? status.Routes[0];
+            sinkName = r.SinkId switch
+            {
+                "mqtt" => "MQTT",
+                "tcp" => "TCP",
+                "keyboard" => "键盘模拟",
+                _ => r.SinkId
+            };
+        }
+
+        int pending = status.PendingCount;
+        int uncertain = status.UncertainCount;
+
+        TxtOutputSinkName.Text = sinkName;
+        if (this.TryFindResource("TextPrimaryBrush", out object? primBrush) && primBrush is IBrush pb)
+            TxtOutputSinkName.Foreground = pb;
+
+        if (pending > 0 || uncertain > 0)
+        {
+            if (this.TryFindResource("WarningBrush", out object? warnBrush) && warnBrush is IBrush wb)
+            {
+                DotOutputStatus.Fill = wb;
+                TxtOutputPendingCount.Foreground = wb;
+            }
+            string countText = $"待发 {pending} 条";
+            if (uncertain > 0) countText += $" (待核对 {uncertain})";
+            TxtOutputPendingCount.Text = countText;
+            BtnClearOutputQueue.IsEnabled = true;
+            BtnClearOutputQueue.IsVisible = true;
+        }
+        else
+        {
+            if (this.TryFindResource("SuccessBrush", out object? succBrush) && succBrush is IBrush sb)
+            {
+                DotOutputStatus.Fill = sb;
+            }
+            if (this.TryFindResource("TextSecondaryBrush", out object? secBrush) && secBrush is IBrush scb)
+            {
+                TxtOutputPendingCount.Foreground = scb;
+            }
+            TxtOutputPendingCount.Text = "待发 0 条";
+            BtnClearOutputQueue.IsEnabled = false;
+            BtnClearOutputQueue.IsVisible = true;
+        }
+
+        ToolTip.SetTip(BtnOutputStatusPill, $"输出通道: {sinkName}\n待发送队列: {pending} 条\n待核对: {uncertain} 条\n已成功送达: {status.DeliveredCount} 条\n点击打开【数据输出】设置");
+    }
+
+    private async void OnOutputStatusPillClick(object? sender, RoutedEventArgs e)
+    {
+        await OpenSettingsDialogAsync(selectCameraTab: false, selectOutputTab: true).ConfigureAwait(true);
     }
 
     private async void OnClearOutputQueue(object? sender, RoutedEventArgs e)
@@ -1050,29 +1644,51 @@ public partial class MainWindow : Window, IAsyncDisposable
                 ? (int)Math.Clamp(Math.Round(h * (_settings.RoiHeight / 100.0)), 1, h)
                 : h;
             // Recompute exact crop size from same formula as above
+            int cropX = 0, cropY = 0;
             if (_settings.EnableRoi)
             {
-                int x = (int)Math.Clamp(Math.Round(w * (_settings.RoiX / 100.0)), 0, Math.Max(0, w - 1));
-                int y = (int)Math.Clamp(Math.Round(h * (_settings.RoiY / 100.0)), 0, Math.Max(0, h - 1));
-                ow = (int)Math.Clamp(Math.Round(w * (_settings.RoiWidth / 100.0)), 1, Math.Max(1, w - x));
-                oh = (int)Math.Clamp(Math.Round(h * (_settings.RoiHeight / 100.0)), 1, Math.Max(1, h - y));
+                cropX = (int)Math.Clamp(Math.Round(w * (_settings.RoiX / 100.0)), 0, Math.Max(0, w - 1));
+                cropY = (int)Math.Clamp(Math.Round(h * (_settings.RoiY / 100.0)), 0, Math.Max(0, h - 1));
+                ow = (int)Math.Clamp(Math.Round(w * (_settings.RoiWidth / 100.0)), 1, Math.Max(1, w - cropX));
+                oh = (int)Math.Clamp(Math.Round(h * (_settings.RoiHeight / 100.0)), 1, Math.Max(1, h - cropY));
             }
-            await RunOcrOnBgrAsync(bgr, ow, oh, model, stamp.SourceId).ConfigureAwait(true);
+            await RunOcrOnBgrAsync(bgr, ow, oh, model, stamp.SourceId, fullWidth: w, fullHeight: h, offsetX: cropX, offsetY: cropY).ConfigureAwait(true);
         }).ConfigureAwait(true);
     }
 
-    private async Task RunOcrOnBgrAsync(byte[] bgr, int width, int height, string model, string sourceId)
+    private async Task RunOcrOnBgrAsync(byte[] bgr, int width, int height, string model, string sourceId,
+        int fullWidth = 0, int fullHeight = 0, int offsetX = 0, int offsetY = 0)
     {
         IOcrReader reader = await EnsureOcrReaderAsync(model).ConfigureAwait(true);
-        var stamp = new FrameStamp(new FrameId(Guid.NewGuid(), 1), sourceId, width, height, Stopwatch.GetTimestamp(), null);
+        int finalW = fullWidth > 0 ? fullWidth : width;
+        int finalH = fullHeight > 0 ? fullHeight : height;
+        var stamp = new FrameStamp(new FrameId(Guid.NewGuid(), 1), sourceId, finalW, finalH, Stopwatch.GetTimestamp(), null);
         var layout = new ImageLayout(FrameEncoding.Raw, PixelFormat.Bgr24, width, height,
             [new PlaneLayout(0, width * 3, width * 3, height)], ColorRange.Full, ColorMatrix.Unspecified);
         var input = new ImageInput(stamp, layout, bgr, ImageTransform.Identity);
-        var request = new RecognitionRequest(new AnalysisId(stamp.Id, 1), Stopwatch.GetTimestamp() + Stopwatch.Frequency * 120);
+        long timeoutTicks = (long)(Math.Max(500, _settings.OcrTimeoutMs) * Stopwatch.Frequency / 1000.0);
+        var request = new RecognitionRequest(new AnalysisId(stamp.Id, 1), Stopwatch.GetTimestamp() + timeoutTicks);
         EngineBatch<OcrLine> batch = await reader.ReadAsync(input, request, CancellationToken.None).ConfigureAwait(true);
+
+        ImmutableArray<OcrLine> items = batch.Items;
+        if ((offsetX > 0 || offsetY > 0) && !items.IsDefaultOrEmpty)
+        {
+            var mapped = ImmutableArray.CreateBuilder<OcrLine>(items.Length);
+            foreach (var line in items)
+            {
+                var q = new Quad(
+                    new Point2(line.Bounds.P0.X + offsetX, line.Bounds.P0.Y + offsetY),
+                    new Point2(line.Bounds.P1.X + offsetX, line.Bounds.P1.Y + offsetY),
+                    new Point2(line.Bounds.P2.X + offsetX, line.Bounds.P2.Y + offsetY),
+                    new Point2(line.Bounds.P3.X + offsetX, line.Bounds.P3.Y + offsetY));
+                mapped.Add(new OcrLine(line.Text, q, line.Confidence, line.Language, line.Words));
+            }
+            items = mapped.MoveToImmutable();
+        }
+
         _lastStamp = stamp;
-        _lastLines = batch.Items;
-        SendOutputButton.IsEnabled = batch.Items.Length > 0;
+        _lastLines = items;
+        SendOutputButton.IsEnabled = items.Length > 0;
         if (batch.Status == StageStatus.Faulted)
         {
             Append($"OCR faulted: {batch.Fault?.Code} {batch.Fault?.Message}");
@@ -1080,9 +1696,10 @@ public partial class MainWindow : Window, IAsyncDisposable
             return;
         }
         var record = new ScanRecord(Guid.NewGuid(), new AnalysisId(stamp.Id, 1), stamp, DateTimeOffset.UtcNow,
-            batch.Items, ImmutableDictionary<string, string>.Empty);
+            items, ImmutableDictionary<string, string>.Empty);
         AddRecord(record);
-        SetStatus($"OCR {batch.Status} · {batch.Items.Length} 行 · {batch.EngineTime.TotalMilliseconds:0} ms");
+        SetPipelineStatus("取景就绪", active: false);
+        SetStatus($"OCR {batch.Status} · {items.Length} 行 · {batch.EngineTime.TotalMilliseconds:0} ms");
     }
 
     private void OnApplyOutput(object? sender, RoutedEventArgs e)
@@ -1129,18 +1746,29 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private async Task<IOcrReader> EnsureOcrReaderAsync(string model)
     {
-        if (_ocrReader is not null && string.Equals(_ocrReaderModel, model, StringComparison.OrdinalIgnoreCase))
+        _settings.SetOcrModel(model);
+        var ocrParamsElement = JsonSerializer.SerializeToElement(_settings.OcrParameters);
+        var targetSettings = new OcrSettings([], _settings.OcrLayout, ocrParamsElement);
+
+        if (_ocrReader is not null &&
+            string.Equals(_ocrReaderModel, model, StringComparison.OrdinalIgnoreCase) &&
+            _activeOcrSettings is not null &&
+            _activeOcrSettings.Layout == targetSettings.Layout &&
+            _activeOcrSettings.ProviderOptions.GetRawText() == ocrParamsElement.GetRawText())
+        {
             return _ocrReader;
+        }
+
         if (_ocrReader is not null)
         {
             await _ocrReader.DisposeAsync().ConfigureAwait(true);
             _ocrReader = null;
         }
-        using var doc = JsonDocument.Parse($"{{\"model\":\"{model}\"}}");
-        var settings = new OcrSettings([], OcrLayout.TextBlock, doc.RootElement.Clone());
-        _ocrReader = await _ocrFactory.CreateAsync(settings, CancellationToken.None).ConfigureAwait(true);
+
+        _ocrReader = await _ocrFactory.CreateAsync(targetSettings, CancellationToken.None).ConfigureAwait(true);
         _ocrReaderModel = model;
-        Append($"OCR reader ready: {_ocrReader.Descriptor.ProviderId}");
+        _activeOcrSettings = targetSettings;
+        Append($"OCR reader ready: {_ocrReader.Descriptor.ProviderId} ({model}, {_settings.OcrLayout})");
         return _ocrReader;
     }
 
@@ -1170,7 +1798,9 @@ public partial class MainWindow : Window, IAsyncDisposable
         ModelCombo.IsEnabled = enabled && !scanning && !roiEditing;
         SettingsButton.IsEnabled = enabled && !scanning && !roiEditing;
         StartScanButton.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
+        StartScanButton.IsVisible = !scanning;
         StopScanButton.IsEnabled = enabled && scanning && !roiEditing;
+        StopScanButton.IsVisible = scanning;
         StartPreviewButton.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
         StopPreviewButton.IsEnabled = enabled && previewing && !roiEditing;
         OcrFrameButton.IsEnabled = enabled && previewing && !roiEditing;
@@ -1189,110 +1819,253 @@ public partial class MainWindow : Window, IAsyncDisposable
             return;
         }
         StatusText.Text = text;
-        TxtSessionState.Text = text;
-        TxtHeaderSession.Text = text;
-        UpdateStatusPill(text);
     }
 
-    private void UpdateStatusPill(string text)
+    private void SetPipelineStatus(string text, bool active = false, bool fault = false)
     {
-        bool fault = text.Contains("错误", StringComparison.OrdinalIgnoreCase) ||
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => SetPipelineStatus(text, active, fault));
+            return;
+        }
+        TxtSessionState.Text = text;
+        UpdateStatusPill(text, active, fault);
+    }
+
+    private void SetHeaderSessionStatus(string text, bool active = false, bool fault = false)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => SetHeaderSessionStatus(text, active, fault));
+            return;
+        }
+        TxtHeaderSession.Text = text;
+        DotHeaderStatus.Fill = ResolveBrush(fault ? "DangerBrush" : active ? "SuccessBrush" : "TextMutedBrush", Brushes.Gray);
+    }
+
+    private void UpdateStatusPill(string text, bool active, bool fault)
+    {
+        bool isFault = fault || text.Contains("错误", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("fault", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("failed", StringComparison.OrdinalIgnoreCase);
-        bool active = text.Contains("扫描", StringComparison.OrdinalIgnoreCase) ||
+        bool isActive = active || text.Contains("扫描", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("running", StringComparison.OrdinalIgnoreCase) ||
-            text.Contains("preview", StringComparison.OrdinalIgnoreCase);
-        bool warning = text.Contains("警告", StringComparison.OrdinalIgnoreCase) ||
+            text.Contains("识别", StringComparison.OrdinalIgnoreCase);
+        bool isWarning = text.Contains("警告", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("拒绝", StringComparison.OrdinalIgnoreCase) ||
             text.Contains("暂停", StringComparison.OrdinalIgnoreCase);
 
-        string background = fault || warning ? "SurfaceSubtleBackgroundBrush" :
-            active ? "BrandSoftBrush" : "SurfaceSubtleBackgroundBrush";
-        string border = fault ? "DangerBrush" : warning ? "WarningBrush" :
-            active ? "BrandBrush" : "BorderSubtleBrush";
-        string foreground = fault ? "DangerBrush" : warning ? "WarningBrush" :
-            active ? "BrandBrush" : "TextPrimaryBrush";
+        string background = isFault || isWarning ? "SurfaceSubtleBackgroundBrush" :
+            isActive ? "BrandSoftBrush" : "SurfaceSubtleBackgroundBrush";
+        string border = isFault ? "DangerBrush" : isWarning ? "WarningBrush" :
+            isActive ? "BrandBrush" : "BorderSubtleBrush";
+        string foreground = isFault ? "DangerBrush" : isWarning ? "WarningBrush" :
+            isActive ? "BrandBrush" : "TextPrimaryBrush";
 
         PillScanStatus.Background = ResolveBrush(background, Brushes.Transparent);
         PillScanStatus.BorderBrush = ResolveBrush(border, Brushes.Transparent);
         DotState.Fill = ResolveBrush(border, Brushes.Gray);
         TxtSessionState.Foreground = ResolveBrush(foreground, Brushes.White);
-        DotHeaderStatus.Fill = ResolveBrush(border, Brushes.Gray);
     }
 
     private void SetPreviewChrome(bool running, bool scanning)
     {
-        PanelPlaceholder.IsVisible = !running && PreviewImage.Source is null;
+        bool showPlaceholder = (!running && PreviewImage.Source is null) || (running && !_settings.PreviewEnabled);
+        PanelPlaceholder.IsVisible = showPlaceholder;
+
+        if (showPlaceholder)
+        {
+            if (running && !_settings.PreviewEnabled)
+            {
+                TxtPlaceholderTitle.Text = "预览已关闭";
+                TxtPlaceholderSub.Text = "连续采样与识别仍在后台正常运行";
+            }
+            else if (_cameras.Length == 0 && _playlist.Count == 0)
+            {
+                TxtPlaceholderTitle.Text = "未检测到相机设备";
+                TxtPlaceholderSub.Text = "请插入 USB 相机或点击【导入图片】加载本地图集";
+            }
+            else if (CameraDeviceCombo.SelectedItem is null)
+            {
+                TxtPlaceholderTitle.Text = "未选择相机";
+                TxtPlaceholderSub.Text = "请在上方工具栏或系统设置中选择输入设备";
+            }
+            else
+            {
+                TxtPlaceholderTitle.Text = "未启动扫描";
+                TxtPlaceholderSub.Text = "选择相机与工作模式后，点击上方【启动扫描】";
+            }
+        }
+
         var success = ResolveBrush("SuccessBrush", Brushes.LimeGreen);
         var muted = ResolveBrush("TextMutedBrush", Brushes.Gray);
         DotHudLive.Fill = running ? success : muted;
         DotState.Fill = running ? success : muted;
         TxtHudTitle.Text = scanning ? "连续扫描" : running ? "实时画面" : "取景预览";
         TxtPreviewMetrics.Text = running ? (scanning ? "会话预览中" : "预览中") : "未启用";
-        UpdateRoiOverlay();
+        RedrawOverlay();
     }
 
-    private void OnZoomIn(object? sender, RoutedEventArgs e) => Zoom(1.25);
-    private void OnZoomOut(object? sender, RoutedEventArgs e) => Zoom(1.0 / 1.25);
-    private void OnZoomReset(object? sender, RoutedEventArgs e) => ResetZoom();
-    private void OnViewportWheel(object? sender, PointerWheelEventArgs e)
+    // ==================== Viewport 缩放、平移与交互 ====================
+
+    private void OnViewportSizeChanged(object? sender, SizeChangedEventArgs e)
     {
-        Zoom(e.Delta.Y > 0 ? 1.15 : 1.0 / 1.15);
+        if (ResultToastScrollerOcr != null)
+        {
+            ResultToastScrollerOcr.MaxHeight = Math.Max(0, e.NewSize.Height - 100);
+            ResultToastScrollerOcr.Width = Math.Min(260, Math.Max(0, e.NewSize.Width - 24));
+        }
+        RedrawOverlay();
+    }
+
+    private void OnViewportMouseWheel(object? sender, PointerWheelEventArgs e)
+    {
+        e.Handled = true;
+        double delta = e.Delta.Y;
+        if (Math.Abs(delta) < 0.001) return;
+        double factor = delta > 0 ? 1.15 : (1.0 / 1.15);
+        Point cursorInHost = e.GetPosition(ViewportHost);
+        ZoomAtPoint(factor, cursorInHost);
+    }
+
+    private void OnViewportMouseDown(object? sender, PointerPressedEventArgs e)
+    {
+        if (_isEditingRoi)
+        {
+            HandleRoiMouseDown(e);
+            return;
+        }
+
+        if (e.ClickCount == 2)
+        {
+            StopViewportPan();
+            ResetViewportZoom();
+            e.Handled = true;
+            return;
+        }
+
+        var props = e.GetCurrentPoint(ViewportCanvasArea).Properties;
+        if (props.IsLeftButtonPressed)
+        {
+            _dragStartPoint = e.GetPosition(ViewportHost);
+            _isDraggingViewport = true;
+            e.Pointer.Capture(ViewportCanvasArea);
+            ViewportCanvasArea.Cursor = new Cursor(StandardCursorType.SizeAll);
+            e.Handled = true;
+        }
+    }
+
+    private void OnViewportMouseMove(object? sender, PointerEventArgs e)
+    {
+        if (_isEditingRoi)
+        {
+            HandleRoiMouseMove(e);
+            return;
+        }
+
+        if (_isDraggingViewport)
+        {
+            Point current = e.GetPosition(ViewportHost);
+            double dx = current.X - _dragStartPoint.X;
+            double dy = current.Y - _dragStartPoint.Y;
+            _dragStartPoint = current;
+            _viewportTranslate.X += dx;
+            _viewportTranslate.Y += dy;
+            e.Handled = true;
+        }
+    }
+
+    private void OnViewportMouseUp(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_isEditingRoi)
+        {
+            HandleRoiMouseUp(e);
+            return;
+        }
+
+        if (_isDraggingViewport && e.InitialPressMouseButton == MouseButton.Left)
+        {
+            StopViewportPan();
+            e.Handled = true;
+        }
+    }
+
+    private void OnViewportLostMouseCapture(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (_isEditingRoi)
+        {
+            OnRoiLostMouseCapture(sender, e);
+            return;
+        }
+
+        StopViewportPan();
+    }
+
+    private void StopViewportPan()
+    {
+        _isDraggingViewport = false;
+        ViewportCanvasArea.Cursor = _isEditingRoi ? new Cursor(StandardCursorType.Cross) : new Cursor(StandardCursorType.Arrow);
+    }
+
+    private void OnViewportDoubleTap(object? sender, TappedEventArgs e)
+    {
+        StopViewportPan();
+        ResetViewportZoom();
         e.Handled = true;
     }
-    private void OnViewportDoubleTap(object? sender, TappedEventArgs e) => ResetZoom();
 
-    private void Zoom(double factor)
+    private void OnZoomIn(object? sender, RoutedEventArgs e) =>
+        ZoomAtPoint(1.25, new Point(ViewportHost.Bounds.Width * 0.5, ViewportHost.Bounds.Height * 0.5));
+
+    private void OnZoomOut(object? sender, RoutedEventArgs e) =>
+        ZoomAtPoint(1.0 / 1.25, new Point(ViewportHost.Bounds.Width * 0.5, ViewportHost.Bounds.Height * 0.5));
+
+    private void OnZoomReset(object? sender, RoutedEventArgs e) => ResetViewportZoom();
+
+    private void ZoomAtPoint(double factor, Point center)
     {
-        _zoomFactor = Math.Clamp(_zoomFactor * factor, MinZoom, MaxZoom);
-        _previewZoom.ScaleX = _zoomFactor;
-        _previewZoom.ScaleY = _zoomFactor;
+        double oldZoom = _zoomFactor;
+        double newZoom = Math.Clamp(_zoomFactor * factor, MinZoom, MaxZoom);
+        if (Math.Abs(newZoom - oldZoom) < 0.001) return;
+
+        double k = newZoom / oldZoom;
+        _zoomFactor = newZoom;
+        _viewportScale.ScaleX = _zoomFactor;
+        _viewportScale.ScaleY = _zoomFactor;
+
+        double originX = ViewportHost.Bounds.Width * 0.5;
+        double originY = ViewportHost.Bounds.Height * 0.5;
+        _viewportTranslate.X = (center.X - originX) * (1 - k) + _viewportTranslate.X * k;
+        _viewportTranslate.Y = (center.Y - originY) * (1 - k) + _viewportTranslate.Y * k;
+
         UpdateZoomLevelText();
+        RedrawOverlay();
     }
 
-    private void ResetZoom()
+    private void ResetViewportZoom()
     {
         _zoomFactor = 1.0;
-        _previewZoom.ScaleX = 1;
-        _previewZoom.ScaleY = 1;
+        _viewportScale.ScaleX = 1.0;
+        _viewportScale.ScaleY = 1.0;
+        _viewportTranslate.X = 0;
+        _viewportTranslate.Y = 0;
         UpdateZoomLevelText();
+        RedrawOverlay();
     }
 
     private void UpdateZoomLevelText() =>
-        TxtZoomLevel.Text = $"{(_zoomFactor * 100):0}%";
+        TxtZoomLevel.Text = $"{Math.Round(_zoomFactor * 100)}%";
 
     private void OnToggleGuides(object? sender, RoutedEventArgs e)
     {
         _settings.ShowPreviewGuides = !_settings.ShowPreviewGuides;
-        UpdateGuidesVisibility();
-    }
-
-    private void UpdateGuidesVisibility()
-    {
-        bool show = _settings.ShowPreviewGuides;
-        CrosshairH.IsVisible = show;
-        CrosshairV.IsVisible = show;
-    }
-
-    private void UpdateRoiOverlay()
-    {
-        RoiRect.IsVisible = _isEditingRoi || _settings.EnableRoi;
-        UpdateOverlayGeometry();
+        RedrawOverlay();
     }
 
     private void UpdatePreviewSurfaceGeometry()
     {
         if (_sourceWidth <= 0 || _sourceHeight <= 0) return;
-
-        PreviewScaleRoot.Width = _sourceWidth;
-        PreviewScaleRoot.Height = _sourceHeight;
-        PreviewImage.Width = _sourceWidth;
-        PreviewImage.Height = _sourceHeight;
-        OverlayCanvas.Width = _sourceWidth;
-        OverlayCanvas.Height = _sourceHeight;
-        RoiEditorVisualCanvas.Width = _sourceWidth;
-        RoiEditorVisualCanvas.Height = _sourceHeight;
-        UpdateOverlayGeometry();
+        RedrawOverlay();
         SetBusyUi(!_busy);
     }
 
@@ -1300,329 +2073,256 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         _sourceWidth = 0;
         _sourceHeight = 0;
-        PreviewScaleRoot.Width = 0;
-        PreviewScaleRoot.Height = 0;
-        PreviewImage.Width = 0;
-        PreviewImage.Height = 0;
-        OverlayCanvas.Width = 0;
-        OverlayCanvas.Height = 0;
-        RoiEditorVisualCanvas.Children.Clear();
-        RoiRect.IsVisible = false;
+        _lastLines = [];
+        SyncFrameAnnotations();
         SetBusyUi(!_busy);
     }
 
-    private void UpdateOverlayGeometry()
+    // ==================== Overlay 绘制与 OCR 浮动气泡 ====================
+
+    private void SyncFrameAnnotations()
     {
+        ReplaceResultToasts(_lastLines);
+        RedrawOverlay();
+    }
+
+    private void RedrawOverlay()
+    {
+        OverlayCanvas.Children.Clear();
+        if (_isEditingRoi)
+        {
+            DrawRoiEditorOverlay();
+            return;
+        }
+
         if (_sourceWidth <= 0 || _sourceHeight <= 0) return;
+        double canvasW = OverlayCanvas.Bounds.Width;
+        double canvasH = OverlayCanvas.Bounds.Height;
+        if (canvasW <= 0 || canvasH <= 0) return;
 
-        double w = _sourceWidth;
-        double h = _sourceHeight;
-        CrosshairH.StartPoint = new Avalonia.Point(0, h * 0.5);
-        CrosshairH.EndPoint = new Avalonia.Point(w, h * 0.5);
-        CrosshairV.StartPoint = new Avalonia.Point(w * 0.5, 0);
-        CrosshairV.EndPoint = new Avalonia.Point(w * 0.5, h);
+        double scale = Math.Min(canvasW / _sourceWidth, canvasH / _sourceHeight);
+        double displayW = _sourceWidth * scale;
+        double displayH = _sourceHeight * scale;
+        double offsetX = (canvasW - displayW) / 2.0;
+        double offsetY = (canvasH - displayH) / 2.0;
 
-        Rect roi = _isEditingRoi
-            ? _roiDraft
-            : new Rect(_settings.RoiX / 100.0, _settings.RoiY / 100.0,
-                _settings.RoiWidth / 100.0, _settings.RoiHeight / 100.0);
-        roi = ClampRoi(roi);
-        Canvas.SetLeft(RoiRect, w * roi.Left);
-        Canvas.SetTop(RoiRect, h * roi.Top);
-        RoiRect.Width = Math.Max(1, w * roi.Width);
-        RoiRect.Height = Math.Max(1, h * roi.Height);
-        UpdateRoiEditorVisuals(roi, w, h);
-    }
+        if (_settings.ShowPreviewGuides)
+            DrawPreviewGuides(offsetX, offsetY, displayW, displayH);
 
-    private void UpdateRoiEditorVisuals(Rect roi, double imageWidth, double imageHeight)
-    {
-        RoiEditorVisualCanvas.Children.Clear();
-        if (!_isEditingRoi) return;
-
-        double left = roi.Left * imageWidth;
-        double top = roi.Top * imageHeight;
-        double right = roi.Right * imageWidth;
-        double bottom = roi.Bottom * imageHeight;
-        IBrush shade = new SolidColorBrush(Color.FromArgb(112, 0, 0, 0));
-        IBrush handleBrush = ResolveBrush("BrandBrush", Brushes.DeepSkyBlue);
-
-        void AddShade(double x, double y, double width, double height)
+        // Draw bounding boxes for OCR lines
+        if (!_lastLines.IsDefaultOrEmpty)
         {
-            if (width <= 0 || height <= 0) return;
-            var shape = new Rectangle
+            foreach (var item in _lastLines)
             {
-                Width = width,
-                Height = height,
-                Fill = shade,
-                IsHitTestVisible = false
-            };
-            Canvas.SetLeft(shape, x);
-            Canvas.SetTop(shape, y);
-            RoiEditorVisualCanvas.Children.Add(shape);
-        }
+                bool isHovered = ReferenceEquals(_hoveredAnnotation, item) ||
+                                 (_hoveredAnnotation is OcrLine o &&
+                                  o.Text == item.Text &&
+                                  o.Bounds.Equals(item.Bounds));
 
-        AddShade(0, 0, imageWidth, top);
-        AddShade(0, top, left, bottom - top);
-        AddShade(right, top, imageWidth - right, bottom - top);
-        AddShade(0, bottom, imageWidth, imageHeight - bottom);
+                var poly = new Polygon
+                {
+                    StrokeThickness = isHovered ? 3 : 2,
+                    Points =
+                    [
+                        new Point(offsetX + item.Bounds.P0.X * scale, offsetY + item.Bounds.P0.Y * scale),
+                        new Point(offsetX + item.Bounds.P1.X * scale, offsetY + item.Bounds.P1.Y * scale),
+                        new Point(offsetX + item.Bounds.P2.X * scale, offsetY + item.Bounds.P2.Y * scale),
+                        new Point(offsetX + item.Bounds.P3.X * scale, offsetY + item.Bounds.P3.Y * scale)
+                    ]
+                };
 
-        double handleSize = Math.Clamp(Math.Min(imageWidth, imageHeight) * 0.012, 8, 18);
-        foreach (var corner in new[]
-        {
-            new Point(left, top), new Point(right, top),
-            new Point(left, bottom), new Point(right, bottom)
-        })
-        {
-            var handle = new Border
-            {
-                Width = handleSize,
-                Height = handleSize,
-                Background = Brushes.White,
-                BorderBrush = handleBrush,
-                BorderThickness = new Thickness(1),
-                IsHitTestVisible = false
-            };
-            Canvas.SetLeft(handle, corner.X - handleSize / 2);
-            Canvas.SetTop(handle, corner.Y - handleSize / 2);
-            RoiEditorVisualCanvas.Children.Add(handle);
-        }
-    }
+                if (isHovered)
+                {
+                    poly.Fill = ResolveBrush("SymbologyBadgeOcrTintBrush", new SolidColorBrush(Color.FromArgb(50, 0, 122, 255)));
+                    poly.Stroke = ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.DodgerBlue);
+                }
+                else
+                {
+                    poly.Fill = Brushes.Transparent;
+                    poly.Stroke = ResolveBrush("BrandBrush", Brushes.DodgerBlue);
+                }
 
-    private void OnBeginRoiEdit(object? sender, RoutedEventArgs e)
-    {
-        if (_isEditingRoi || _roiBusy) return;
-        if (_activeSession is not null)
-        {
-            Append("连续扫描运行中，请先停止扫描再编辑 ROI。");
-            return;
-        }
-        if (PreviewImage.Source is null || _sourceWidth <= 0 || _sourceHeight <= 0)
-        {
-            Append("请先启动预览或显示一张图片，再编辑 ROI。");
-            return;
-        }
+                var captured = item;
+                poly.PointerEntered += (_, _) =>
+                {
+                    _hoveredAnnotation = captured;
+                    RedrawOverlay();
+                };
+                poly.PointerExited += (_, _) =>
+                {
+                    if (ReferenceEquals(_hoveredAnnotation, captured))
+                    {
+                        _hoveredAnnotation = null;
+                        RedrawOverlay();
+                    }
+                };
 
-        _roiDraft = ClampRoi(new Rect(
-            _settings.RoiX / 100.0,
-            _settings.RoiY / 100.0,
-            _settings.RoiWidth / 100.0,
-            _settings.RoiHeight / 100.0));
-        _roiDragMode = RoiDragMode.None;
-        _isEditingRoi = true;
-        RoiEditorBar.IsVisible = true;
-        BtnEditRoi.IsVisible = false;
-        OverlayCanvas.IsHitTestVisible = true;
-        UpdateRoiDraftText();
-        UpdateRoiOverlay();
-        SetBusyUi(true);
-        SetStatus("编辑 ROI");
-        Append("ROI 编辑已开启：拖动空白处框选，拖动区域移动，四角调整。");
-    }
-
-    private async void OnSaveRoi(object? sender, RoutedEventArgs e)
-    {
-        if (!_isEditingRoi || _roiBusy || !IsRoiDraftValid()) return;
-        _roiBusy = true;
-        BtnRoiSave.IsEnabled = false;
-        try
-        {
-            var settings = _settings.Clone();
-            settings.EnableRoi = true;
-            settings.RoiX = _roiDraft.Left * 100;
-            settings.RoiY = _roiDraft.Top * 100;
-            settings.RoiWidth = _roiDraft.Width * 100;
-            settings.RoiHeight = _roiDraft.Height * 100;
-            if (!settings.Validate(out string? error))
-            {
-                Append(error ?? "ROI 配置无效。");
-                return;
-            }
-
-            await _settingsManager.SaveAsync(settings).ConfigureAwait(true);
-            _settings = settings.Clone();
-            try { _coordinator.Configure(_settings.GetOutputRoutes()); } catch { /* preserve saved ROI */ }
-            EndRoiEdit();
-            Append("ROI 已保存；下次启动扫描时生效。");
-            SetStatus("ROI 已保存");
-        }
-        catch (Exception ex)
-        {
-            Append($"ROI 保存失败: {ex.Message}");
-        }
-        finally
-        {
-            _roiBusy = false;
-            if (_isEditingRoi)
-            {
-                UpdateRoiDraftText();
-                BtnRoiSave.IsEnabled = IsRoiDraftValid();
+                OverlayCanvas.Children.Add(poly);
             }
         }
-    }
 
-    private void OnCancelRoi(object? sender, RoutedEventArgs e)
-    {
-        if (!_roiBusy) EndRoiEdit();
-    }
-
-    private void OnFullRoi(object? sender, RoutedEventArgs e)
-    {
-        if (!_isEditingRoi || _roiBusy) return;
-        _roiDraft = new Rect(0, 0, 1, 1);
-        UpdateRoiDraftText();
-        UpdateOverlayGeometry();
-    }
-
-    private void EndRoiEdit()
-    {
-        if (!_isEditingRoi) return;
-        _roiDragMode = RoiDragMode.None;
-        _roiBusy = false;
-        OverlayCanvas.IsHitTestVisible = false;
-        RoiEditorBar.IsVisible = false;
-        BtnEditRoi.IsVisible = true;
-        _isEditingRoi = false;
-        UpdateRoiOverlay();
-        SetBusyUi(true);
-    }
-
-    private bool IsRoiDraftValid() =>
-        _sourceWidth > 0 && _sourceHeight > 0 &&
-        _roiDraft.Width >= 1.0 / _sourceWidth &&
-        _roiDraft.Height >= 1.0 / _sourceHeight;
-
-    private void UpdateRoiDraftText()
-    {
-        TxtRoiDraftCoordinates.Text = string.Create(CultureInfo.InvariantCulture,
-            $"X1 {_roiDraft.Left * 100:0.0}%   Y1 {_roiDraft.Top * 100:0.0}%   X2 {_roiDraft.Right * 100:0.0}%   Y2 {_roiDraft.Bottom * 100:0.0}%");
-        BtnRoiSave.IsEnabled = IsRoiDraftValid() && !_roiBusy;
-    }
-
-    private bool TryGetNormalizedPointer(PointerEventArgs e, out Point point)
-    {
-        point = default;
-        if (_sourceWidth <= 0 || _sourceHeight <= 0) return false;
-        Point local = e.GetPosition(OverlayCanvas);
-        point = new Point(
-            Math.Clamp(local.X / _sourceWidth, 0, 1),
-            Math.Clamp(local.Y / _sourceHeight, 0, 1));
-        return true;
-    }
-
-    private void OnRoiPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (!_isEditingRoi || _roiBusy ||
-            e.GetCurrentPoint(OverlayCanvas).Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed ||
-            !TryGetNormalizedPointer(e, out Point point)) return;
-
-        double hitX = Math.Clamp(14.0 / Math.Max(1, _sourceWidth), 0.004, 0.08);
-        double hitY = Math.Clamp(14.0 / Math.Max(1, _sourceHeight), 0.004, 0.08);
-        bool Near(double x, double y) => Math.Abs(point.X - x) <= hitX && Math.Abs(point.Y - y) <= hitY;
-
-        _roiDragStart = point;
-        _roiDragOrigin = _roiDraft;
-        _roiDragMode = Near(_roiDraft.Left, _roiDraft.Top) ? RoiDragMode.NorthWest :
-            Near(_roiDraft.Right, _roiDraft.Top) ? RoiDragMode.NorthEast :
-            Near(_roiDraft.Left, _roiDraft.Bottom) ? RoiDragMode.SouthWest :
-            Near(_roiDraft.Right, _roiDraft.Bottom) ? RoiDragMode.SouthEast :
-            _roiDraft.Contains(point) ? RoiDragMode.Move : RoiDragMode.Create;
-        e.Pointer.Capture(OverlayCanvas);
-        e.Handled = true;
-    }
-
-    private void OnRoiPointerMoved(object? sender, PointerEventArgs e)
-    {
-        if (!_isEditingRoi || _roiBusy || _roiDragMode == RoiDragMode.None ||
-            !TryGetNormalizedPointer(e, out Point point)) return;
-
-        Rect roi = _roiDragOrigin;
-        double minW = 1.0 / Math.Max(1, _sourceWidth);
-        double minH = 1.0 / Math.Max(1, _sourceHeight);
-        switch (_roiDragMode)
+        // Draw ROI rectangle if enabled
+        if (_settings.EnableRoi && TryGetRoiGeometry(out var ix, out var iy, out var iw, out var ih))
         {
-            case RoiDragMode.Create:
-                roi = new Rect(new Point(Math.Min(_roiDragStart.X, point.X), Math.Min(_roiDragStart.Y, point.Y)),
-                    new Point(Math.Max(_roiDragStart.X, point.X), Math.Max(_roiDragStart.Y, point.Y)));
-                break;
-            case RoiDragMode.Move:
-                roi = new Rect(
-                    Math.Clamp(_roiDragOrigin.X + point.X - _roiDragStart.X, 0, 1 - _roiDragOrigin.Width),
-                    Math.Clamp(_roiDragOrigin.Y + point.Y - _roiDragStart.Y, 0, 1 - _roiDragOrigin.Height),
-                    _roiDragOrigin.Width, _roiDragOrigin.Height);
-                break;
-            case RoiDragMode.NorthWest:
-                double west = Math.Clamp(point.X, 0, _roiDragOrigin.Right - minW);
-                double north = Math.Clamp(point.Y, 0, _roiDragOrigin.Bottom - minH);
-                roi = new Rect(west, north, _roiDragOrigin.Right - west, _roiDragOrigin.Bottom - north);
-                break;
-            case RoiDragMode.NorthEast:
-                double eastY = Math.Clamp(point.Y, 0, _roiDragOrigin.Bottom - minH);
-                double eastX = Math.Clamp(point.X, _roiDragOrigin.Left + minW, 1);
-                roi = new Rect(_roiDragOrigin.Left, eastY, eastX - _roiDragOrigin.Left, _roiDragOrigin.Bottom - eastY);
-                break;
-            case RoiDragMode.SouthWest:
-                double southWestX = Math.Clamp(point.X, 0, _roiDragOrigin.Right - minW);
-                double southWestY = Math.Clamp(point.Y, _roiDragOrigin.Top + minH, 1);
-                roi = new Rect(southWestX, _roiDragOrigin.Top,
-                    _roiDragOrigin.Right - southWestX, southWestY - _roiDragOrigin.Top);
-                break;
-            case RoiDragMode.SouthEast:
-                double southEastX = Math.Clamp(point.X, _roiDragOrigin.Left + minW, 1);
-                double southEastY = Math.Clamp(point.Y, _roiDragOrigin.Top + minH, 1);
-                roi = new Rect(_roiDragOrigin.Left, _roiDragOrigin.Top,
-                    southEastX - _roiDragOrigin.Left, southEastY - _roiDragOrigin.Top);
-                break;
-        }
-
-        _roiDraft = ClampRoi(roi);
-        UpdateRoiDraftText();
-        UpdateOverlayGeometry();
-        e.Handled = true;
-    }
-
-    private void OnRoiPointerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (!_isEditingRoi || _roiDragMode == RoiDragMode.None ||
-            e.InitialPressMouseButton != MouseButton.Left) return;
-        if (!IsRoiDraftValid()) _roiDraft = _roiDragOrigin;
-        _roiDragMode = RoiDragMode.None;
-        e.Pointer.Capture(null);
-        UpdateRoiDraftText();
-        UpdateOverlayGeometry();
-        e.Handled = true;
-    }
-
-    private void OnRoiPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
-    {
-        if (!_isEditingRoi || _roiDragMode == RoiDragMode.None) return;
-        _roiDragMode = RoiDragMode.None;
-        if (!IsRoiDraftValid()) _roiDraft = _roiDragOrigin;
-        UpdateRoiDraftText();
-        UpdateOverlayGeometry();
-    }
-
-    private void OnWindowKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (!_isEditingRoi) return;
-        if (e.Key == Key.Escape)
-        {
-            EndRoiEdit();
-            e.Handled = true;
-        }
-        else if (e.Key == Key.Enter && IsRoiDraftValid())
-        {
-            OnSaveRoi(this, new RoutedEventArgs());
-            e.Handled = true;
+            var accent = ResolveBrush("BrandBrush", Brushes.DodgerBlue);
+            double rx = ix + (_settings.RoiX / 100.0) * iw;
+            double ry = iy + (_settings.RoiY / 100.0) * ih;
+            double rw = (_settings.RoiWidth / 100.0) * iw;
+            double rh = (_settings.RoiHeight / 100.0) * ih;
+            var rect = new Rectangle
+            {
+                Width = Math.Max(0, rw),
+                Height = Math.Max(0, rh),
+                Stroke = accent,
+                StrokeThickness = 1.5,
+                StrokeDashArray = [4, 2],
+                Fill = new SolidColorBrush(Color.FromArgb(16, 0, 122, 255)),
+                IsHitTestVisible = false
+            };
+            Canvas.SetLeft(rect, rx);
+            Canvas.SetTop(rect, ry);
+            OverlayCanvas.Children.Add(rect);
         }
     }
 
-    private static Rect ClampRoi(Rect roi)
+    private void DrawPreviewGuides(double offsetX, double offsetY, double displayW, double displayH)
     {
-        double left = Math.Clamp(roi.Left, 0, 1);
-        double top = Math.Clamp(roi.Top, 0, 1);
-        double right = Math.Clamp(roi.Right, left, 1);
-        double bottom = Math.Clamp(roi.Bottom, top, 1);
-        return new Rect(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+        var brush = ResolveBrush("ReticleAccentBrush", Brushes.DeepSkyBlue);
+        double midX = offsetX + displayW * 0.5;
+        double midY = offsetY + displayH * 0.5;
+        var lineH = new Line
+        {
+            StartPoint = new Point(offsetX, midY),
+            EndPoint = new Point(offsetX + displayW, midY),
+            Stroke = brush,
+            StrokeThickness = 1.2,
+            Opacity = 0.85,
+            IsHitTestVisible = false
+        };
+        var lineV = new Line
+        {
+            StartPoint = new Point(midX, offsetY),
+            EndPoint = new Point(midX, offsetY + displayH),
+            Stroke = brush,
+            StrokeThickness = 1.2,
+            Opacity = 0.85,
+            IsHitTestVisible = false
+        };
+        OverlayCanvas.Children.Add(lineH);
+        OverlayCanvas.Children.Add(lineV);
+    }
+
+    private void ReplaceResultToasts(ImmutableArray<OcrLine> ocrLines)
+    {
+        ResultToastStackOcr.Children.Clear();
+        if (ocrLines.IsDefaultOrEmpty)
+        {
+            ResultToastScrollerOcr.IsVisible = false;
+            return;
+        }
+
+        foreach (var line in ocrLines)
+        {
+            var capturedLine = line;
+            string confText = line.Confidence.HasValue ? $" ({line.Confidence.Value * 100:0.#}%)" : "";
+            var heading = new TextBlock
+            {
+                Text = $"OCR{confText}",
+                FontSize = 11,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.DeepSkyBlue)
+            };
+            var content = new TextBlock
+            {
+                Text = line.Text,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxHeight = 36,
+                Margin = new Thickness(0, 4, 0, 0),
+                Foreground = ResolveBrush("TextPrimaryBrush", Brushes.White)
+            };
+            var body = new StackPanel();
+            body.Children.Add(heading);
+            body.Children.Add(content);
+
+            bool isHovered = ReferenceEquals(_hoveredAnnotation, capturedLine) ||
+                             (_hoveredAnnotation is OcrLine o && o.Text == capturedLine.Text && o.Bounds.Equals(capturedLine.Bounds));
+            var card = new Border
+            {
+                Tag = capturedLine,
+                Child = body,
+                Cursor = new Cursor(StandardCursorType.Hand),
+                BorderThickness = new Thickness(3, 1, 1, 1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(10, 7),
+                Margin = new Thickness(0, 0, 4, 6),
+                BorderBrush = ResolveBrush("SymbologyBadgeOcrBorderBrush", Brushes.DeepSkyBlue),
+                Background = ResolveBrush(isHovered ? "SymbologyBadgeOcrBorderBrush" : "SymbologyBadgeOcrTintBrush",
+                    new SolidColorBrush(Color.FromArgb(140, 22, 34, 53)))
+            };
+            ToolTip.SetTip(card, line.Text);
+
+            card.PointerPressed += (_, pe) =>
+            {
+                if (pe.GetCurrentPoint(card).Properties.IsLeftButtonPressed)
+                {
+                    var match = _allResults.FirstOrDefault(r => r.Text == capturedLine.Text);
+                    if (match != null) ResultsList.SelectedItem = match;
+                }
+            };
+            card.PointerEntered += (_, _) =>
+            {
+                _hoveredAnnotation = capturedLine;
+                RedrawOverlay();
+            };
+            card.PointerExited += (_, _) =>
+            {
+                if (ReferenceEquals(_hoveredAnnotation, capturedLine))
+                {
+                    _hoveredAnnotation = null;
+                    RedrawOverlay();
+                }
+            };
+            ResultToastStackOcr.Children.Add(card);
+        }
+
+        ResultToastScrollerOcr.IsVisible = ResultToastStackOcr.Children.Count > 0;
+        if (ResultToastStackOcr.Children.Count > 0)
+        {
+            ResultToastScrollerOcr.ScrollToEnd();
+        }
+    }
+
+    private async void OnWindowKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_isEditingRoi)
+        {
+            if (e.Key == Key.Escape)
+            {
+                EndRoiEdit();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter && IsRoiDraftValid())
+            {
+                OnSaveRoi(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+            return;
+        }
+
+        if (e.Key == Key.Space)
+        {
+            var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+            if (focused is not TextBox)
+            {
+                if (_activeSession is not null)
+                    await StopScanningAsync();
+                else
+                    await StartScanningAsync();
+                e.Handled = true;
+            }
+        }
     }
 
     private static IBrush ResolveBrush(string key, IBrush fallback)
@@ -1652,6 +2352,8 @@ public partial class MainWindow : Window, IAsyncDisposable
             Dispatcher.UIThread.Post(() => Append(line));
             return;
         }
+        _logLinesCount++;
+        TxtLogLineCount.Text = $"{_logLinesCount} 行";
         Log.Text = string.IsNullOrEmpty(Log.Text) ? line : Log.Text + Environment.NewLine + line;
         Log.CaretIndex = Log.Text?.Length ?? 0;
     }

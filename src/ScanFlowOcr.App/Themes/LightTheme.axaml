@@ -1,44 +1,102 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <!-- ScanFlow light tokens (ui-design-spec / LightTheme.xaml) -->
-  <Color x:Key="AppBackgroundColor">#f4f6f9</Color>
+
+  <!-- Neutral Light Color Palette (Aligned with Prototype) -->
+  <Color x:Key="AppBackgroundColor">#f4f6f8</Color>
   <Color x:Key="SurfaceBackgroundColor">#ffffff</Color>
   <Color x:Key="SurfaceSubtleBackgroundColor">#ebf0f4</Color>
   <Color x:Key="SurfaceHoverBackgroundColor">#e3e8ee</Color>
-  <Color x:Key="ViewportBackgroundColor">#eaedf2</Color>
-  <Color x:Key="BorderSubtleColor">#e2e6eb</Color>
-  <Color x:Key="BorderMediumColor">#b6bec7</Color>
-  <Color x:Key="TextPrimaryColor">#1a1f26</Color>
-  <Color x:Key="TextSecondaryColor">#495057</Color>
-  <Color x:Key="TextMutedColor">#868e96</Color>
-  <Color x:Key="BrandColor">#1864ab</Color>
-  <Color x:Key="BrandHoverColor">#14538c</Color>
-  <Color x:Key="BrandSoftColor">#eaf2fc</Color>
-  <Color x:Key="SuccessColor">#2b8a3e</Color>
-  <Color x:Key="WarningColor">#e67700</Color>
-  <Color x:Key="DangerColor">#c92a2a</Color>
-  <Color x:Key="ViewportOverlayBgColor">#eef4f6f8</Color>
-  <Color x:Key="ViewportOverlayBorderColor">#cbd3db</Color>
-  <Color x:Key="ReticleGridColor">#b8c2cc</Color>
+  <Color x:Key="SurfaceCardColor">#ffffff</Color>
+  <Color x:Key="SurfaceInputColor">#f6f8fa</Color>
+  <Color x:Key="ViewportBackgroundColor">#e9ecf0</Color>
 
+  <Color x:Key="BorderSubtleColor">#d0d7de</Color>
+  <Color x:Key="BorderMediumColor">#b6bec7</Color>
+  <Color x:Key="BorderFocusColor">#0969da</Color>
+
+  <Color x:Key="TextPrimaryColor">#1f2328</Color>
+  <Color x:Key="TextSecondaryColor">#4a5462</Color>
+  <Color x:Key="TextMutedColor">#768392</Color>
+  <Color x:Key="TextInverseColor">#ffffff</Color>
+
+  <Color x:Key="BrandColor">#0969da</Color>
+  <Color x:Key="BrandHoverColor">#0858b7</Color>
+  <Color x:Key="BrandSoftColor">#eaf2fc</Color>
+  <Color x:Key="BrandBorderColor">#b8d5f7</Color>
+
+  <Color x:Key="SuccessColor">#1a7f37</Color>
+  <Color x:Key="WarningColor">#9a6700</Color>
+  <Color x:Key="DangerColor">#cf222e</Color>
+  <Color x:Key="DuplicateColor">#6e5494</Color>
+
+  <!-- SolidColorBrushes -->
   <SolidColorBrush x:Key="AppBackgroundBrush" Color="{StaticResource AppBackgroundColor}" />
   <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="{StaticResource SurfaceBackgroundColor}" />
   <SolidColorBrush x:Key="SurfaceSubtleBackgroundBrush" Color="{StaticResource SurfaceSubtleBackgroundColor}" />
   <SolidColorBrush x:Key="SurfaceHoverBackgroundBrush" Color="{StaticResource SurfaceHoverBackgroundColor}" />
+  <SolidColorBrush x:Key="SurfaceCardBrush" Color="{StaticResource SurfaceCardColor}" />
+  <SolidColorBrush x:Key="SurfaceInputBrush" Color="{StaticResource SurfaceInputColor}" />
   <SolidColorBrush x:Key="ViewportBackgroundBrush" Color="{StaticResource ViewportBackgroundColor}" />
+
   <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}" />
   <SolidColorBrush x:Key="BorderMediumBrush" Color="{StaticResource BorderMediumColor}" />
+  <SolidColorBrush x:Key="BorderFocusBrush" Color="{StaticResource BorderFocusColor}" />
+
   <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
   <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
   <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+  <SolidColorBrush x:Key="TextInverseBrush" Color="{StaticResource TextInverseColor}" />
+
   <SolidColorBrush x:Key="BrandBrush" Color="{StaticResource BrandColor}" />
   <SolidColorBrush x:Key="BrandHoverBrush" Color="{StaticResource BrandHoverColor}" />
   <SolidColorBrush x:Key="BrandSoftBrush" Color="{StaticResource BrandSoftColor}" />
+  <SolidColorBrush x:Key="BrandBorderBrush" Color="{StaticResource BrandBorderColor}" />
+
   <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
   <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
   <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
-  <SolidColorBrush x:Key="ViewportOverlayBackgroundBrush" Color="{StaticResource ViewportOverlayBgColor}" />
-  <SolidColorBrush x:Key="ViewportOverlayBorderBrush" Color="{StaticResource ViewportOverlayBorderColor}" />
-  <SolidColorBrush x:Key="ReticleGridBrush" Color="{StaticResource ReticleGridColor}" />
-  <SolidColorBrush x:Key="ReticleAccentBrush" Color="{StaticResource BrandColor}" />
+  <SolidColorBrush x:Key="DuplicateBrush" Color="{StaticResource DuplicateColor}" />
+
+  <!-- Soft Semantic Brushes (Matched to Prototype) -->
+  <SolidColorBrush x:Key="SuccessBgBrush" Color="#dafbe1" />
+  <SolidColorBrush x:Key="SuccessTextBrush" Color="#1a7f37" />
+  <SolidColorBrush x:Key="SuccessBorderBrush" Color="#a8e8b8" />
+
+  <SolidColorBrush x:Key="DuplicateBgBrush" Color="#f3eff9" />
+  <SolidColorBrush x:Key="DuplicateTextBrush" Color="#594379" />
+  <SolidColorBrush x:Key="DuplicateBorderBrush" Color="#d4c2ed" />
+
+  <SolidColorBrush x:Key="DangerBgBrush" Color="#ffebe9" />
+  <SolidColorBrush x:Key="DangerTextBrush" Color="#cf222e" />
+  <SolidColorBrush x:Key="DangerBorderBrush" Color="#ff8182" />
+
+  <SolidColorBrush x:Key="WarningBgBrush" Color="#fff8c5" />
+  <SolidColorBrush x:Key="WarningTextBrush" Color="#9a6700" />
+  <SolidColorBrush x:Key="WarningBorderBrush" Color="#f1e05a" />
+
+  <!-- Viewport Overlay & Reticle Brushes -->
+  <SolidColorBrush x:Key="ViewportOverlayBackgroundBrush" Color="#eef4f6f8" />
+  <SolidColorBrush x:Key="ViewportOverlayBorderBrush" Color="#cbd3db" />
+  <SolidColorBrush x:Key="ReticleGridBrush" Color="#b8c2cc" />
+  <SolidColorBrush x:Key="ReticleAccentBrush" Color="#0969da" />
+
+  <RadialGradientBrush x:Key="ReticleCenterGlowBrush" Center="50%,50%" GradientOrigin="50%,50%" RadiusX="50%" RadiusY="50%">
+    <GradientStop Color="#140969da" Offset="0" />
+    <GradientStop Color="#00e9ecf0" Offset="1" />
+  </RadialGradientBrush>
+
+  <!-- OCR Badges -->
+  <SolidColorBrush x:Key="SymbologyBadgeOcrBgBrush" Color="#eff6ff" />
+  <SolidColorBrush x:Key="SymbologyBadgeOcrTintBrush" Color="#eff6ff" Opacity="0.55" />
+  <SolidColorBrush x:Key="SymbologyBadgeOcrBorderBrush" Color="#bfdbfe" />
+  <SolidColorBrush x:Key="SymbologyBadgeOcrTextBrush" Color="#1d4ed8" />
+
+  <!-- Green ToggleSwitch Brushes (Matching Reference) -->
+  <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#16a34a" />
+  <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#22c55e" />
+  <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#15803d" />
+  <SolidColorBrush x:Key="ToggleSwitchStrokeOn" Color="#16a34a" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOn" Color="#ffffff" />
+  <SolidColorBrush x:Key="ToggleSwitchKnobFillOff" Color="#ffffff" />
+
 </ResourceDictionary>

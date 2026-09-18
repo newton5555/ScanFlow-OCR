@@ -58,6 +58,19 @@ internal sealed class ImagePlaylistCameraProvider(ICameraProvider hardware) : IC
         return descriptor;
     }
 
+    public void ClearImportedImages()
+    {
+        lock (_gate)
+        {
+            _paths = [];
+            _descriptor = null;
+            _width = 0;
+            _height = 0;
+            _startIndex = 0;
+            _activeSession = null;
+        }
+    }
+
     public void SetStartIndex(int index)
     {
         lock (_gate)

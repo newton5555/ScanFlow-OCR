@@ -1,9 +1,11 @@
+using System.Collections.Immutable;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
+using ScanFlowOcr.App.Capture;
 using ScanFlowOcr.App.Models;
 using ScanFlowOcr.Contracts;
 using ScanFlowOcr.Outputs;
@@ -14,25 +16,79 @@ public partial class SettingsWindow : Window
 {
     private readonly AppSettings _draft;
     private readonly OutputCoordinator? _coordinator;
+    private readonly ImmutableArray<CameraDescriptor> _availableCameras;
+    private readonly ICameraProvider? _cameraProvider;
 
     public AppSettings? Result { get; private set; }
+    public CameraDescriptor? SelectedDevice { get; private set; }
+    public CaptureMode? SelectedMode { get; private set; }
 
     public SettingsWindow() : this(new AppSettings()) { }
 
-    public SettingsWindow(AppSettings current, string? activePath = null, OutputCoordinator? coordinator = null)
+    public SettingsWindow(
+        AppSettings current,
+        string? activePath = null,
+        OutputCoordinator? coordinator = null,
+        ImmutableArray<CameraDescriptor> availableCameras = default,
+        ICameraProvider? cameraProvider = null,
+        int currentDeviceIndex = -1,
+        int currentModeIndex = -1)
     {
         InitializeComponent();
         _draft = current.Clone();
         _coordinator = coordinator;
+        _availableCameras = availableCameras;
+        _cameraProvider = cameraProvider;
+        if (currentDeviceIndex >= 0)
+        {
+            _draft.PreferredCameraIndex = currentDeviceIndex;
+        }
+        if (currentModeIndex >= 0)
+        {
+            _draft.PreferredModeIndex = currentModeIndex;
+        }
         LoadFromDraft();
         RefreshOutputStatus();
         if (TxtPath is not null && !string.IsNullOrEmpty(activePath))
             TxtPath.Text = $"配置文件: {activePath}";
+
+        if (OperatingSystem.IsLinux())
+        {
+            WindowDecorations = Avalonia.Controls.WindowDecorations.Full;
+            BtnCloseWindow.IsVisible = false;
+        }
+    }
+
+    private void OnTitleBarPointerPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            BeginMoveDrag(e);
+        }
+    }
+
+    private void OnCloseWindowClick(object? sender, RoutedEventArgs e)
+    {
+        Close();
+    }
+
+    public void SelectCameraTab()
+    {
+        SettingsTabControl.SelectedItem = TabCameraSettings;
+    }
+
+    public void SelectOutputTab()
+    {
+        SettingsTabControl.SelectedItem = TabOutputSettings;
     }
 
     private void LoadFromDraft()
     {
-        SelectModel(_draft.GetOcrModel());
+        SelectTagged(ModelCombo, _draft.GetOcrModel());
+        SelectTagged(CmbOcrDetSide, _draft.OcrParameters.TryGetValue("detectSideLength", out var detSide) ? detSide : "640");
+        SelectTagged(CmbOcrLayout, _draft.OcrLayout == OcrLayout.SingleLine ? "SingleLine" : "TextBlock");
+        ChkOcrDirection.IsChecked = !_draft.OcrParameters.TryGetValue("useDirectionClassification", out var dir) || !bool.TryParse(dir, out var dirOn) || dirOn;
+        TxtOcrMinConfidence.Text = _draft.OcrParameters.TryGetValue("minConfidencePercent", out var minConf) ? minConf : "90";
         OcrTimeoutBox.Text = _draft.OcrTimeoutMs.ToString(CultureInfo.InvariantCulture);
         RbDedupeSession.IsChecked = _draft.DedupeMode == DedupeMode.Session;
         RbDedupeCooldown.IsChecked = _draft.DedupeMode == DedupeMode.Cooldown;
@@ -54,6 +110,13 @@ public partial class SettingsWindow : Window
 
         PreferredCameraBox.Text = _draft.PreferredCameraIndex.ToString(CultureInfo.InvariantCulture);
         PreferredModeBox.Text = _draft.PreferredModeIndex.ToString(CultureInfo.InvariantCulture);
+
+        if (!_availableCameras.IsDefaultOrEmpty)
+        {
+            SettingsCameraDeviceCombo.ItemsSource = _availableCameras.Select(c => c.DisplayName).ToList();
+            int camIdx = Math.Clamp(_draft.PreferredCameraIndex, 0, _availableCameras.Length - 1);
+            SettingsCameraDeviceCombo.SelectedIndex = camIdx;
+        }
 
         RbOutNone.IsChecked = !_draft.MqttEnabled && !_draft.TcpEnabled && !_draft.KeyboardEnabled;
         RbOutKeyboard.IsChecked = _draft.KeyboardEnabled;
@@ -77,6 +140,34 @@ public partial class SettingsWindow : Window
         QueueCapacityBox.Text = _draft.OutputQueueCapacity.ToString(CultureInfo.InvariantCulture);
     }
 
+    private async void OnSettingsCameraDeviceChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        int index = SettingsCameraDeviceCombo.SelectedIndex;
+        if (_cameraProvider is null || _availableCameras.IsDefaultOrEmpty || index < 0 || index >= _availableCameras.Length)
+        {
+            SettingsCameraModeCombo.ItemsSource = null;
+            return;
+        }
+
+        try
+        {
+            var device = _availableCameras[index];
+            var modes = await _cameraProvider.GetModesAsync(device.Id, CancellationToken.None).ConfigureAwait(true);
+            SettingsCameraModeCombo.ItemsSource = modes.Select(m =>
+                ImagePlaylistCameraProvider.IsImageDevice(device.Id)
+                    ? $"{m.Width}×{m.Height} · {m.FpsDenominator} ms/张"
+                    : $"{m.Width}×{m.Height} @ {m.FpsNumerator}/{Math.Max(1, m.FpsDenominator)} · {(m.Encoding == FrameEncoding.Jpeg ? "MJPEG" : "RGB24/32")}").ToList();
+            SettingsCameraModeCombo.Tag = modes;
+            int modeIdx = Math.Clamp(_draft.PreferredModeIndex, 0, Math.Max(0, modes.Length - 1));
+            if (modes.Length > 0)
+                SettingsCameraModeCombo.SelectedIndex = modeIdx;
+        }
+        catch
+        {
+            SettingsCameraModeCombo.ItemsSource = null;
+        }
+    }
+
     private void SelectModel(string model)
     {
         for (int i = 0; i < ModelCombo.ItemCount; i++)
@@ -91,6 +182,14 @@ public partial class SettingsWindow : Window
         ModelCombo.SelectedIndex = 0;
     }
 
+    private void OnResetRoiToFull(object? sender, RoutedEventArgs e)
+    {
+        RoiXBox.Text = "0";
+        RoiYBox.Text = "0";
+        RoiWBox.Text = "100";
+        RoiHBox.Text = "100";
+    }
+
     private void OnCancel(object? sender, RoutedEventArgs e) => Close(null);
 
     private async void OnSave(object? sender, RoutedEventArgs e)
@@ -102,6 +201,18 @@ public partial class SettingsWindow : Window
             {
                 ShowError(error ?? "配置无效。");
                 return;
+            }
+            if (!_availableCameras.IsDefaultOrEmpty &&
+                SettingsCameraDeviceCombo.SelectedIndex >= 0 &&
+                SettingsCameraDeviceCombo.SelectedIndex < _availableCameras.Length)
+            {
+                SelectedDevice = _availableCameras[SettingsCameraDeviceCombo.SelectedIndex];
+            }
+            if (SettingsCameraModeCombo.Tag is ImmutableArray<CaptureMode> modes &&
+                SettingsCameraModeCombo.SelectedIndex >= 0 &&
+                SettingsCameraModeCombo.SelectedIndex < modes.Length)
+            {
+                SelectedMode = modes[SettingsCameraModeCombo.SelectedIndex];
             }
             Result = _draft.Clone();
             Close(Result);
@@ -115,9 +226,26 @@ public partial class SettingsWindow : Window
 
     private void ApplyUiToDraft()
     {
-        string model = ModelCombo.SelectedItem is ComboBoxItem mi && mi.Content is string s ? s : "tiny";
+        string model = ModelCombo.SelectedItem is ComboBoxItem mi && mi.Tag is string s ? s : "tiny";
         _draft.SetOcrModel(model);
-        _draft.OcrTimeoutMs = ParseInt(OcrTimeoutBox.Text, 5000);
+
+        _draft.OcrLayout = CmbOcrLayout.SelectedItem is ComboBoxItem layoutItem &&
+                           string.Equals(layoutItem.Tag?.ToString(), "SingleLine", StringComparison.OrdinalIgnoreCase)
+            ? OcrLayout.SingleLine
+            : OcrLayout.TextBlock;
+
+        if (CmbOcrDetSide.SelectedItem is ComboBoxItem detItem && detItem.Tag is string detTag)
+            _draft.OcrParameters["detectSideLength"] = detTag;
+        else
+            _draft.OcrParameters["detectSideLength"] = "640";
+
+        _draft.OcrParameters["useDirectionClassification"] = ChkOcrDirection.IsChecked == true ? "true" : "false";
+
+        int minConf = Math.Clamp(ParseInt(TxtOcrMinConfidence.Text, 90), 0, 100);
+        _draft.OcrParameters["minConfidencePercent"] = minConf.ToString(CultureInfo.InvariantCulture);
+
+        int timeout = Math.Clamp(ParseInt(OcrTimeoutBox.Text, 5000), 500, 30000);
+        _draft.OcrTimeoutMs = timeout;
         _draft.DedupeMode =
             RbDedupeCooldown.IsChecked == true ? DedupeMode.Cooldown :
             RbDedupeUntilAbsent.IsChecked == true ? DedupeMode.UntilAbsent :
@@ -137,8 +265,12 @@ public partial class SettingsWindow : Window
         _draft.PreviewMaxWidth = ParseInt(PreviewMaxWBox.Text, 0);
         _draft.PreviewMaxHeight = ParseInt(PreviewMaxHBox.Text, 0);
 
-        _draft.PreferredCameraIndex = ParseInt(PreferredCameraBox.Text, 0);
-        _draft.PreferredModeIndex = ParseInt(PreferredModeBox.Text, 0);
+        _draft.PreferredCameraIndex = SettingsCameraDeviceCombo.SelectedIndex >= 0
+            ? SettingsCameraDeviceCombo.SelectedIndex
+            : ParseInt(PreferredCameraBox.Text, 0);
+        _draft.PreferredModeIndex = SettingsCameraModeCombo.SelectedIndex >= 0
+            ? SettingsCameraModeCombo.SelectedIndex
+            : ParseInt(PreferredModeBox.Text, 0);
 
         _draft.KeyboardEnabled = RbOutKeyboard.IsChecked == true;
         _draft.MqttEnabled = RbOutMqtt.IsChecked == true;
@@ -234,7 +366,7 @@ public partial class SettingsWindow : Window
     private void ShowError(string message)
     {
         TxtError.Text = message;
-        TxtError.IsVisible = true;
+        BannerError.IsVisible = !string.IsNullOrWhiteSpace(message);
     }
 
     private static int ParseInt(string? text, int fallback) =>

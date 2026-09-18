@@ -7,169 +7,288 @@
         MinWidth="980" MinHeight="640"
         WindowStartupLocation="CenterScreen"
         KeyDown="OnWindowKeyDown"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="-1"
+        WindowDecorations="None"
         Background="{DynamicResource AppBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
-  <Grid RowDefinitions="42,Auto,*,28">
 
-    <!-- Header -->
-    <Border Grid.Row="0" Background="{DynamicResource SurfaceBackgroundBrush}"
-            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1">
-      <Grid ColumnDefinitions="Auto,*,Auto" Margin="14,0,10,0">
-        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandBrush}">
-            <TextBlock Text="SF" FontSize="10" FontWeight="Bold" Foreground="White"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-          <TextBlock Text="ScanFlow-OCR" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Border Classes="chip" VerticalAlignment="Center">
-            <TextBlock Text="桌面 OCR 工作台" Classes="muted" />
-          </Border>
-        </StackPanel>
-        <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Classes="chip" Padding="10,3">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <Ellipse x:Name="DotHeaderStatus" Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" />
-            <TextBlock Text="会话:" Classes="muted" VerticalAlignment="Center" />
-            <TextBlock x:Name="TxtHeaderSession" Text="服务已就绪" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+  <Border BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+    <Grid RowDefinitions="42,Auto,Auto,*,Auto,28">
+
+      <!-- 0: App Header / Title Bar (42px) -->
+      <Border x:Name="TitleBarBorder" Grid.Row="0" Height="42" Background="{DynamicResource SurfaceBackgroundBrush}"
+              BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
+              PointerPressed="OnTitleBarPointerPressed">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <!-- Header Left: Brand Logo & Title -->
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="14,0,0,0">
+            <Border Background="{DynamicResource BrandBrush}" CornerRadius="4" Width="22" Height="22">
+              <Path Data="{StaticResource GeoBrandLogo}" Fill="#ffffff" Width="13" Height="13" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="ScanFlow-OCR" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+            <Border Classes="chip" VerticalAlignment="Center">
+              <TextBlock Text="桌面 OCR 工作台" Classes="muted" />
+            </Border>
           </StackPanel>
-        </Border>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-          <Button x:Name="SettingsButton" Classes="outline" Height="28" Content="设置" Click="OnOpenSettings" />
-          <Button x:Name="ThemeToggleButton" Classes="ghost" Width="32" Height="28" Padding="0"
-                  ToolTip.Tip="切换浅色 / 深色主题" Click="OnToggleTheme">
-            <TextBlock x:Name="ThemeToggleGlyph" Text="☀" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+          <!-- Header Center: Session Badge -->
+          <Border x:Name="BadgeBackendStatus" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                  Classes="status-pill" Padding="10,3">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Ellipse x:Name="DotHeaderStatus" Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" />
+              <TextBlock Text="会话: " FontSize="11" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock x:Name="TxtHeaderSession" Text="服务已就绪" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+
+          <!-- Header Right: Theme Toggle & Settings & Window Caption Buttons -->
+          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
+            <Button x:Name="ThemeToggleButton" Classes="ghost" Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                    VerticalAlignment="Center" ToolTip.Tip="切换浅色 / 深色主题" Click="OnToggleTheme">
+              <Path x:Name="PathThemeIcon" Data="{StaticResource GeoSun}" Fill="{DynamicResource WarningBrush}" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Button>
+            <Button x:Name="SettingsButton" Classes="outline" Height="28" Padding="10,3" Margin="0,0,8,0"
+                    VerticalAlignment="Center" Click="OnOpenSettings">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Path Data="{StaticResource GeoGear}" Fill="{DynamicResource TextPrimaryBrush}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="设置" FontSize="12" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+
+            <Border x:Name="CaptionDivider" Width="1" Height="16" Background="{DynamicResource BorderSubtleBrush}" VerticalAlignment="Center" Margin="0,0,2,0" />
+
+            <!-- Window Caption Buttons (Minimize, Maximize/Restore, Close) -->
+            <StackPanel x:Name="PanelCaptionButtons" Orientation="Horizontal" VerticalAlignment="Stretch">
+              <Button x:Name="BtnMinimizeWindow" Classes="caption" ToolTip.Tip="最小化" Click="OnMinimizeWindowClick">
+                <Path Data="{StaticResource GeoWindowMinimize}" Width="10" Height="10" Stretch="Uniform" />
+              </Button>
+              <Button x:Name="BtnMaximizeRestoreWindow" Classes="caption" ToolTip.Tip="最大化" Click="OnMaximizeRestoreWindowClick">
+                <Path x:Name="PathMaximizeIcon" Data="{StaticResource GeoWindowMaximize}" Width="10" Height="10" Stretch="Uniform" />
+              </Button>
+              <Button x:Name="BtnCloseWindow" Classes="caption-close" ToolTip.Tip="关闭" Click="OnCloseWindowClick">
+                <Path Data="{StaticResource GeoWindowClose}" Width="10" Height="10" Stretch="Uniform" />
+              </Button>
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+    <!-- 1: Notice Banner -->
+    <Border x:Name="BannerNotice" Grid.Row="1" Background="{DynamicResource WarningBgBrush}"
+            BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="0,0,0,1"
+            Padding="16,8" IsVisible="False">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock x:Name="TxtBannerMessage" Foreground="{DynamicResource WarningTextBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button x:Name="BtnCopyBanner" Classes="ghost" ToolTip.Tip="复制错误信息" Width="26" Height="22" Padding="0" Click="OnCopyBanner">
+            <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource WarningTextBrush}" StrokeThickness="1.2" Width="12" Height="12" Stretch="Uniform" />
+          </Button>
+          <Button Classes="ghost" ToolTip.Tip="关闭提示" Width="24" Height="22" Padding="0" Foreground="{DynamicResource WarningTextBrush}" Click="OnDismissBanner">
+            <TextBlock Text="✕" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
         </StackPanel>
       </Grid>
     </Border>
 
-    <!-- Toolbar -->
-    <Border Grid.Row="1" Classes="panel-card" Margin="12,8,12,0" Padding="10,7">
-      <StackPanel Spacing="7">
-        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <Border x:Name="PillScanStatus" Classes="chip" Padding="8,4" Margin="0,0,10,0" Height="32">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <Ellipse x:Name="DotState" Width="7" Height="7" Fill="{DynamicResource TextMutedBrush}" />
-              <TextBlock x:Name="TxtSessionState" Text="就绪" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+    <!-- 2: Workspace Toolbar -->
+    <Border Grid.Row="2" Classes="panel-card" Margin="12,8,12,0" Padding="10,6" Height="46">
+      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <!-- Left: Status Pill, Divider, Clickable Source Card, Divider, Import Images -->
+        <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+          <!-- Session Status Pill -->
+          <Border x:Name="PillScanStatus" Classes="status-pill" Height="32" Margin="0,0,10,0">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Ellipse x:Name="DotState" Width="7" Height="7" Fill="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+              <TextBlock x:Name="TxtSessionState" Text="未就绪" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </Border>
+
           <Border Width="1" Height="20" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,10,0" />
-          <TextBlock Text="输入源:" Classes="muted" VerticalAlignment="Center" Margin="0,0,6,0" />
-          <ComboBox x:Name="CameraDeviceCombo" MinWidth="150" MaxWidth="220" Height="32" Margin="0,0,6,0"
-                    SelectionChanged="OnCameraDeviceChanged" />
-          <ComboBox x:Name="CameraModeCombo" MinWidth="140" MaxWidth="200" Height="32" Margin="0,0,6,0" />
-          <Button x:Name="RefreshCamerasButton" Classes="outline" Height="32" Margin="0,0,8,0" Content="刷新" Click="OnRefreshCameras" />
+
+          <!-- Clickable Input Source Card -->
+          <Button x:Name="CardCurrentSource" Classes="pill-card" Height="32" Padding="8,3" Margin="0,0,8,0"
+                  Click="OnCurrentSourceCardClick" ToolTip.Tip="当前输入源。点击在【系统设置】中切换相机或调整参数">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Border Width="22" Height="22" CornerRadius="4"
+                      Background="{DynamicResource SurfaceHoverBackgroundBrush}"
+                      BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                      VerticalAlignment="Center">
+                <Path Data="{StaticResource GeoCamera}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <TextBlock Text="输入源:" FontSize="12" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock x:Name="TxtCurrentSourceName" Text="未选择设备" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+              <Border x:Name="BadgeCurrentSourceMode" Classes="chip" VerticalAlignment="Center">
+                <TextBlock x:Name="TxtCurrentSourceMode" Text="-" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
+              </Border>
+              <Path Data="{StaticResource GeoChevronRight}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="8" Height="8" Stretch="Uniform" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+
           <Border Width="1" Height="20" Background="{DynamicResource BorderSubtleBrush}" Margin="0,0,8,0" />
-          <Button Classes="outline" Height="32" Margin="0,0,6,0" Content="导入图片…" Click="OnOpenImages" />
-          <Button Classes="outline" Height="32" Margin="0,0,6,0" Content="导入文件夹…" Click="OnOpenImageFolder" />
+
+          <!-- Import Images Button with MenuFlyout -->
+          <Button Classes="outline" Height="32" Padding="10,3" Margin="0,0,8,0" ToolTip.Tip="导入本地单张/多张图片文件或文件夹">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Path Data="{StaticResource GeoImage}" Fill="{DynamicResource TextSecondaryBrush}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="导入图片" FontSize="12" VerticalAlignment="Center" />
+              <Path Data="{StaticResource GeoChevronDown}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="8" Height="5" Stretch="Uniform" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout Placement="Bottom">
+                <MenuItem Header="图片文件…" Click="OnOpenImages" />
+                <MenuItem Header="图片文件夹…" Click="OnOpenImageFolder" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+
+          <!-- Hidden Compatibility Controls (preserves device enumeration, mode handling, and test bindings) -->
+          <StackPanel x:Name="PanelCompatControls" IsVisible="False" Orientation="Horizontal">
+            <ComboBox x:Name="CameraDeviceCombo" SelectionChanged="OnCameraDeviceChanged" />
+            <ComboBox x:Name="CameraModeCombo" SelectionChanged="OnCameraModeChanged" />
+            <Button x:Name="RefreshCamerasButton" Click="OnRefreshCameras" />
+            <Button x:Name="AdvancedToolbarButton" Click="OnToggleAdvancedToolbar" />
+            <WrapPanel x:Name="AdvancedToolbar">
+              <ComboBox x:Name="ModelCombo" SelectedIndex="0">
+                <ComboBoxItem Content="tiny" />
+                <ComboBoxItem Content="small" />
+              </ComboBox>
+              <Button x:Name="RunOcrButton" Click="OnRunOcr" />
+              <Button x:Name="StartPreviewButton" Click="OnStartPreview" />
+              <Button x:Name="StopPreviewButton" Click="OnStopPreview" />
+              <Button x:Name="OcrFrameButton" Click="OnOcrCurrentFrame" />
+              <Button x:Name="ClearDedupeButton" Click="OnClearDedupe" />
+            </WrapPanel>
+            <RadioButton x:Name="SinkNone" GroupName="Sink" IsChecked="True" />
+            <RadioButton x:Name="SinkKeyboard" GroupName="Sink" />
+            <RadioButton x:Name="SinkMqtt" GroupName="Sink" />
+            <RadioButton x:Name="SinkTcp" GroupName="Sink" />
+            <Button x:Name="ApplyOutputButton" Click="OnApplyOutput" />
+            <Button x:Name="SendOutputButton" Click="OnSendOutput" />
+            <TextBox x:Name="KeyboardTarget" />
+            <TextBox x:Name="MqttBroker" />
+            <TextBox x:Name="MqttTopic" />
+            <TextBox x:Name="TcpHost" />
+            <TextBox x:Name="TcpPort" />
+            <TextBox x:Name="MqttPort" />
+          </StackPanel>
         </WrapPanel>
-        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <TextBlock Text="OCR 模型:" Classes="muted" VerticalAlignment="Center" Margin="0,0,4,0" />
-          <ComboBox x:Name="ModelCombo" Width="90" Height="32" SelectedIndex="0" Margin="0,0,8,0">
-            <ComboBoxItem Content="tiny" />
-            <ComboBoxItem Content="small" />
-          </ComboBox>
-          <Button x:Name="RunOcrButton" Classes="outline" Height="32" Margin="0,0,16,0" Content="识别图片" Click="OnRunOcr" IsEnabled="False" />
-          <Button x:Name="StartScanButton" Classes="primary" Height="34" Margin="0,0,6,0" Content="启动扫描" Click="OnStartScan" />
-          <Button x:Name="StopScanButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="停止扫描" Click="OnStopScan" IsEnabled="False" />
-          <Button x:Name="StartPreviewButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="仅预览" Click="OnStartPreview" />
-          <Button x:Name="StopPreviewButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="停预览" Click="OnStopPreview" IsEnabled="False" />
-          <Button x:Name="OcrFrameButton" Classes="outline" Height="34" Margin="0,0,6,0" Content="识别当前帧" Click="OnOcrCurrentFrame" IsEnabled="False" />
-          <Button x:Name="ClearDedupeButton" Classes="ghost" Height="34" Content="重置去重" Click="OnClearDedupe" ToolTip.Tip="清空会话去重历史" />
-        </WrapPanel>
-      </StackPanel>
+
+        <!-- Right Side: Prominent Single Toggle Scan Action Button -->
+        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="StartScanButton" Classes="primary" Height="34" Padding="18,4" Click="OnStartScan" ToolTip.Tip="快捷键: 空格键 (Space)">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Path Data="{StaticResource GeoPlay}" Fill="#ffffff" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="启动扫描" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="StopScanButton" Classes="danger" Height="34" Padding="18,4" Click="OnStopScan" IsVisible="False" ToolTip.Tip="快捷键: 空格键 (Space) 或 Esc">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Path Data="{StaticResource GeoStop}" Fill="#ffffff" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+              <TextBlock Text="停止扫描" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
     </Border>
 
-    <!-- Workspace -->
-    <Grid Grid.Row="2" Margin="12,8,12,8">
+    <!-- 3: Main Workspace (Grid 2-column: Viewport 68% + Splitter + Results 32%) -->
+    <Grid Grid.Row="3" Margin="12,8,12,8">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="13*" MinWidth="480" />
+        <ColumnDefinition Width="6" />
         <ColumnDefinition Width="6*" MinWidth="340" MaxWidth="580" />
       </Grid.ColumnDefinitions>
 
-      <!-- Viewport -->
-      <Border Grid.Column="0" Classes="panel-card" ClipToBounds="True" Margin="0,0,6,0">
+      <!-- Viewport Card -->
+      <Border Grid.Column="0" Classes="panel-card" ClipToBounds="True">
         <Grid RowDefinitions="*,Auto,30">
-          <Grid Grid.Row="0" x:Name="ViewportHost" Background="{DynamicResource ViewportBackgroundBrush}"
-                PointerWheelChanged="OnViewportWheel" DoubleTapped="OnViewportDoubleTap">
-            <Viewbox x:Name="PreviewViewbox" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <Grid x:Name="PreviewScaleRoot" RenderTransformOrigin="0.5,0.5">
-                <Image x:Name="PreviewImage" Stretch="Fill" HorizontalAlignment="Left" VerticalAlignment="Top" />
-                <!-- Overlay and editor coordinates stay in source-image pixels. Viewbox only scales this surface. -->
-                <Canvas x:Name="OverlayCanvas" Background="Transparent" IsHitTestVisible="False"
-                        PointerPressed="OnRoiPointerPressed"
-                        PointerMoved="OnRoiPointerMoved"
-                        PointerReleased="OnRoiPointerReleased"
-                        PointerCaptureLost="OnRoiPointerCaptureLost">
-                  <Rectangle x:Name="RoiRect" Stroke="{DynamicResource BrandBrush}" StrokeThickness="2"
-                             StrokeDashArray="4,2" Fill="#22007AFF" IsVisible="False" />
-                  <Canvas x:Name="RoiEditorVisualCanvas" IsHitTestVisible="False" />
-                  <!-- Crosshair -->
-                  <Line x:Name="CrosshairH" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="1.2"
-                        Opacity="0.85" IsVisible="True" />
-                  <Line x:Name="CrosshairV" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="1.2"
-                        Opacity="0.85" IsVisible="True" />
-                </Canvas>
-              </Grid>
-            </Viewbox>
 
-            <Panel x:Name="PanelPlaceholder" IsVisible="True">
-              <Grid Width="380" Height="250" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Border Margin="8" BorderBrush="{DynamicResource ReticleGridBrush}" BorderThickness="1" CornerRadius="4" />
-                <Ellipse Width="188" Height="188" Stroke="{DynamicResource ReticleGridBrush}"
-                         StrokeThickness="1" StrokeDashArray="3,3" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <Ellipse Width="112" Height="112" Stroke="{DynamicResource ReticleGridBrush}"
-                         StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <TextBlock Text="⊕" FontSize="28" Foreground="{DynamicResource BrandBrush}"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,24" />
-                <Border Background="{DynamicResource SurfaceBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
-                        CornerRadius="5" Padding="16,9" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,40">
-                  <StackPanel Spacing="3">
-                    <TextBlock x:Name="TxtPlaceholderTitle" Text="未启动扫描" FontWeight="SemiBold" FontSize="13" HorizontalAlignment="Center" />
-                    <TextBlock x:Name="TxtPlaceholderSub" Text="选择相机后【启动扫描】连续 OCR，或导入图片识别"
-                               FontSize="11" Classes="muted" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="310" />
+          <!-- Viewport Host Area -->
+          <Grid Grid.Row="0" x:Name="ViewportHost" Background="{DynamicResource ViewportBackgroundBrush}"
+                SizeChanged="OnViewportSizeChanged" DoubleTapped="OnViewportDoubleTap">
+
+            <!-- Transformed Content Area (centered zoom and pan; ROI owns drag while editing) -->
+            <Grid x:Name="ViewportCanvasArea" ClipToBounds="True" Background="Transparent" RenderTransformOrigin="0.5,0.5"
+                  PointerWheelChanged="OnViewportMouseWheel"
+                  PointerPressed="OnViewportMouseDown"
+                  PointerMoved="OnViewportMouseMove"
+                  PointerReleased="OnViewportMouseUp"
+                  PointerCaptureLost="OnViewportLostMouseCapture">
+
+              <!-- Video Preview Image -->
+              <Image x:Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+              <!-- Overlay Canvas for Bounding Box, ROI, Crosshairs -->
+              <Canvas x:Name="OverlayCanvas" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="Transparent" />
+            </Grid>
+
+            <!-- Precision Reticle Placeholder when Idle -->
+            <Grid x:Name="PanelPlaceholder" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{DynamicResource ReticleCenterGlowBrush}" IsVisible="True">
+              <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Height="260">
+                <!-- Framing Corner Brackets -->
+                <Path Data="{StaticResource GeoCornerTL}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0.8" />
+                <Path Data="{StaticResource GeoCornerTR}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Top" Opacity="0.8" />
+                <Path Data="{StaticResource GeoCornerBL}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Bottom" Opacity="0.8" />
+                <Path Data="{StaticResource GeoCornerBR}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Bottom" Opacity="0.8" />
+
+                <!-- Outer Framing Guide Box -->
+                <Border BorderBrush="{DynamicResource ReticleGridBrush}" BorderThickness="1" Margin="8" CornerRadius="4" Opacity="0.6" />
+
+                <!-- Concentric Reticle Target Rings -->
+                <Ellipse Width="180" Height="180" Stroke="{DynamicResource ReticleGridBrush}" StrokeThickness="1" StrokeDashArray="3,3" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Ellipse Width="120" Height="120" Stroke="{DynamicResource ReticleGridBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.8" />
+
+                <!-- Center Crosshairs -->
+                <Path Data="{StaticResource GeoReticleCrosshair}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="1.5" Width="32" Height="32" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.85" />
+
+                <!-- Center Status Card -->
+                <Border Background="{DynamicResource ViewportOverlayBackgroundBrush}"
+                        BorderBrush="{DynamicResource ViewportOverlayBorderBrush}"
+                        BorderThickness="1" CornerRadius="6"
+                        Padding="16,10" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,110,0,0">
+                  <StackPanel HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock x:Name="TxtPlaceholderTitle" Text="未启动扫描" FontWeight="SemiBold" FontSize="14" HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    <TextBlock x:Name="TxtPlaceholderSub" Text="选择相机与工作模式后，点击上方【启动扫描】" FontSize="11" Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" />
                   </StackPanel>
                 </Border>
               </Grid>
-            </Panel>
+            </Grid>
 
+            <!-- Floating HUD Badge (Top-Left) -->
             <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
                     Background="{DynamicResource ViewportOverlayBackgroundBrush}"
-                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}" BorderThickness="1"
-                    CornerRadius="12" Padding="10,4">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Ellipse x:Name="DotHudLive" Width="6" Height="6" Fill="{DynamicResource TextMutedBrush}" />
-                <TextBlock x:Name="TxtHudTitle" Text="取景预览" FontSize="11" FontWeight="SemiBold"
+                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}"
+                    BorderThickness="1" CornerRadius="12" Padding="10,4">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Ellipse x:Name="DotHudLive" Width="6" Height="6" Fill="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+                <TextBlock x:Name="TxtHudTitle" Text="实时画面" FontSize="11" FontWeight="SemiBold"
                            FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
-                <TextBlock x:Name="TxtDedupeHud" Text="" FontSize="11" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock x:Name="TxtHudSeparator" Text=" · " FontSize="11" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock x:Name="TxtFpsHud" Text="0.0 FPS" FontSize="11" Classes="muted"
+                           FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
               </StackPanel>
             </Border>
 
-            <Border x:Name="LatestResultToast" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12,48,12,0"
-                    Background="{DynamicResource ViewportOverlayBackgroundBrush}"
-                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}" BorderThickness="1"
-                    CornerRadius="6" Padding="10,7" MaxWidth="360" IsVisible="False">
-              <StackPanel Spacing="3">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock Text="OCR 接纳" FontSize="10" Classes="muted" />
-                  <TextBlock x:Name="TxtLatestResultMeta" Text="" FontSize="10" Classes="muted" />
-                </StackPanel>
-                <TextBlock x:Name="TxtLatestResult" Text="" FontSize="12" FontWeight="SemiBold"
-                           TextWrapping="Wrap" MaxWidth="330" />
-              </StackPanel>
-            </Border>
+            <!-- Current-frame OCR decode cards (Right, translucent bubbles) -->
+            <ScrollViewer x:Name="ResultToastScrollerOcr" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                          Margin="12,42,12,52" Width="260" MaxHeight="320" MaxWidth="300"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                          IsVisible="False">
+              <StackPanel x:Name="ResultToastStackOcr" Spacing="6" />
+            </ScrollViewer>
 
-            <Border x:Name="RoiEditorBar" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="12,0,12,12"
+
+            <!-- Interactive ROI Editor Floating Bar -->
+            <Border x:Name="RoiEditorBar" HorizontalAlignment="Right" VerticalAlignment="Top"
+                    Margin="12" Padding="10,8" CornerRadius="6" IsVisible="False"
                     Background="{DynamicResource ViewportOverlayBackgroundBrush}"
-                    BorderBrush="{DynamicResource BrandBrush}" BorderThickness="1"
-                    CornerRadius="7" Padding="10,7" IsVisible="False">
+                    BorderBrush="{DynamicResource BrandBrush}" BorderThickness="1">
               <StackPanel Spacing="5">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="编辑识别区域" FontSize="12" FontWeight="SemiBold" />
-                  <TextBlock Text="拖动空白处框选 · 拖动区域移动 · 四角调整" FontSize="10" Classes="muted"
-                             VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock x:Name="TxtRoiDraftCoordinates" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
+                <TextBlock Text="编辑识别区域" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource TextPrimaryBrush}" />
+                <TextBlock x:Name="TxtRoiDraftCoordinates" FontSize="11"
+                           FontFamily="Cascadia Code, Consolas, monospace"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
                   <Button Classes="ghost" Height="26" Content="全画面" Click="OnFullRoi" />
                   <Button Classes="ghost" Height="26" Content="取消" Click="OnCancelRoi" />
@@ -178,27 +297,33 @@
               </StackPanel>
             </Border>
 
-            <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12"
-                    Background="{DynamicResource ViewportOverlayBackgroundBrush}"
-                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}" BorderThickness="1"
-                    CornerRadius="8" Padding="4">
-              <Button x:Name="BtnEditRoi" Classes="ghost" Height="24" Content="编辑 ROI"
-                      Click="OnBeginRoiEdit" ToolTip.Tip="在当前画面中拖拽框选 OCR 识别区域" />
-            </Border>
-
-            <!-- Zoom pill -->
-            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12"
-                    Background="{DynamicResource ViewportOverlayBackgroundBrush}"
-                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}" BorderThickness="1"
-                    CornerRadius="8" Padding="4">
-              <StackPanel Orientation="Horizontal" Spacing="2">
-                <Button Classes="ghost" Width="28" Height="24" Content="−" Click="OnZoomOut" ToolTip.Tip="缩小" />
-                <Button Classes="ghost" Height="24" Padding="6,0" Click="OnZoomReset">
-                  <TextBlock x:Name="TxtZoomLevel" Text="100%" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
+            <!-- Viewport Zoom & Tools Capsule Pill (Bottom-Right) -->
+            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" Height="28"
+                    Background="{DynamicResource SurfaceBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}"
+                    BorderThickness="1" CornerRadius="14" Padding="6,0">
+              <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                <Button x:Name="BtnEditRoi" Classes="ghost" Height="22" Padding="6,0"
+                        ToolTip.Tip="在当前画面中框选 OCR 识别区域" Click="OnBeginRoiEdit">
+                  <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                    <Path Data="{StaticResource GeoSliders}" Fill="{DynamicResource TextSecondaryBrush}" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                    <TextBlock Text="编辑 ROI" FontSize="11" VerticalAlignment="Center" />
+                  </StackPanel>
                 </Button>
-                <Button Classes="ghost" Width="28" Height="24" Content="+" Click="OnZoomIn" ToolTip.Tip="放大" />
-                <Button x:Name="BtnToggleGuides" Classes="ghost" Width="28" Height="24" Content="✚"
-                        Click="OnToggleGuides" ToolTip.Tip="准星开关" />
+                <Border Width="1" Height="14" Background="{DynamicResource BorderSubtleBrush}" Margin="4,0" VerticalAlignment="Center" />
+                <Button x:Name="BtnToggleGuides" Classes="ghost" Height="22" Padding="8,0"
+                        ToolTip.Tip="显示 / 隐藏画面中心十字标尺线" Click="OnToggleGuides">
+                  <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                    <Path Data="{StaticResource GeoReticleCrosshair}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                    <TextBlock Text="十字线" FontSize="11" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+                <Border Width="1" Height="14" Background="{DynamicResource BorderSubtleBrush}" Margin="4,0" VerticalAlignment="Center" />
+                <Button Classes="ghost" Width="22" Height="22" Padding="0" Content="−" Click="OnZoomOut" ToolTip.Tip="缩小画面" />
+                <Button Classes="ghost" Height="22" Padding="6,0" Click="OnZoomReset" ToolTip.Tip="双击视口或点击还原 (1:1 / 适应窗口)">
+                  <TextBlock x:Name="TxtZoomLevel" Text="100%" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </Button>
+                <Button Classes="ghost" Width="22" Height="22" Padding="0" Content="+" Click="OnZoomIn" ToolTip.Tip="放大画面" />
               </StackPanel>
             </Border>
 
@@ -206,64 +331,92 @@
                        TextWrapping="Wrap" MaxWidth="420" Foreground="{DynamicResource DangerBrush}" IsVisible="False" />
           </Grid>
 
-          <!-- Playlist -->
-          <Border Grid.Row="1" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
+          <!-- Row 1: Playlist / Images Drawer -->
+          <Border Grid.Row="1" x:Name="DrawerPlaylist" IsVisible="False" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
                   BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
-            <Grid RowDefinitions="28,*">
-              <Border Grid.Row="0" Padding="10,0">
-                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                  <TextBlock Text="图像列表" FontSize="11" FontWeight="SemiBold" />
-                  <Border Classes="chip">
-                    <TextBlock x:Name="TxtImageCount" Text="0 张" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
-                  </Border>
-                </StackPanel>
-              </Border>
-              <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="116">
-                <ItemsControl x:Name="PlaylistItems" Margin="8,0,8,8">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <StackPanel Orientation="Horizontal" Spacing="8" />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:PlaylistThumbnailItem">
-                      <StackPanel Width="88" Spacing="3">
-                      <Border Classes="playlist-card" Classes.active="{Binding IsActive}" Width="88" Height="72" CornerRadius="4" ClipToBounds="True"
-                              BorderThickness="2"
-                              BorderBrush="{DynamicResource BorderSubtleBrush}"
-                              Background="{DynamicResource SurfaceBackgroundBrush}"
-                              PointerPressed="OnPlaylistItemPressed"
-                              Tag="{Binding}">
-                        <Grid>
-                          <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-                          <Border Background="#88000000" VerticalAlignment="Bottom" Padding="4,2">
-                            <TextBlock Text="{Binding IndexDisplay}" FontSize="10" Foreground="White" />
-                          </Border>
-                        </Grid>
-                      </Border>
-                      <TextBlock Text="{Binding FileName}" FontSize="10" Classes="muted" TextTrimming="CharacterEllipsis" HorizontalAlignment="Center" />
-                      </StackPanel>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </ScrollViewer>
+            <Grid RowDefinitions="30,Auto">
+              <!-- Drawer Header Toggle Bar -->
+              <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,0">
+                <Button Classes="ghost" Height="30" HorizontalAlignment="Left" Padding="4,0" Click="OnToggleDrawer">
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Path Data="{StaticResource GeoImage}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" />
+                    <TextBlock Text="图像列表" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Border Classes="chip">
+                      <TextBlock x:Name="TxtImageCount" Text="0 张" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
+                    </Border>
+                    <Path x:Name="PathDrawerChevron" Data="{StaticResource GeoChevronDown}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="9" Height="9" Stretch="Uniform" VerticalAlignment="Center" Margin="4,0,0,0" />
+                  </StackPanel>
+                </Button>
+                <!-- Drawer Right Actions: Clear button -->
+                <Button Grid.Column="1" Classes="danger-soft" Height="22" Padding="6,1" Click="OnClearPlaylist" ToolTip.Tip="清空已导入图片并恢复默认状态">
+                  <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Path Data="{StaticResource GeoTrash}" Fill="{DynamicResource DangerTextBrush}" Width="10" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                    <TextBlock Text="清空" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+
+              <!-- Thumbnails Tray with Left/Right Scroll Buttons -->
+              <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,6">
+                <!-- Left Scroll Arrow -->
+                <Button Grid.Column="0" Classes="ghost" Width="26" Height="86" Padding="0" Click="OnPlaylistScrollLeft" ToolTip.Tip="向前滚动" VerticalAlignment="Center">
+                  <Path Data="{StaticResource GeoChevronLeft}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="10" Height="14" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+
+                <!-- ScrollViewer with auto-hiding scrollbar -->
+                <ScrollViewer Grid.Column="1" x:Name="DrawerBody" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="4,2" MaxHeight="122">
+                  <ItemsControl x:Name="PlaylistItems">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="10" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="models:PlaylistThumbnailItem">
+                        <Border Classes="playlist-card" Classes.active="{Binding IsActive}" Width="104" Height="86"
+                                PointerPressed="OnPlaylistItemPressed" Tag="{Binding}" ToolTip.Tip="单击预览，双击单识别当前图片">
+                          <Grid RowDefinitions="*,20">
+                            <Grid Grid.Row="0">
+                              <Image Source="{Binding Thumbnail}" Stretch="Uniform" Margin="4,4,4,2" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                              <!-- Index Badge (Top-Left) -->
+                              <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5,4,0,0" Background="#aa000000" CornerRadius="2" Padding="4,1">
+                                <TextBlock Text="{Binding IndexDisplay}" FontSize="11" Foreground="#ffffff" FontFamily="Cascadia Code, Consolas, monospace" FontWeight="Bold" />
+                              </Border>
+                            </Grid>
+                            <!-- File Name Label -->
+                            <Border Grid.Row="1" Background="{DynamicResource SurfaceSubtleBackgroundBrush}" Padding="4,0">
+                              <TextBlock Text="{Binding FileName}" FontSize="11" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                            </Border>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+
+                <!-- Right Scroll Arrow -->
+                <Button Grid.Column="2" Classes="ghost" Width="26" Height="86" Padding="0" Click="OnPlaylistScrollRight" ToolTip.Tip="向后滚动" VerticalAlignment="Center">
+                  <Path Data="{StaticResource GeoChevronRight}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="10" Height="14" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Button>
+              </Grid>
             </Grid>
           </Border>
 
+          <!-- Row 2: Viewport Bottom Metrics Bar -->
           <Border Grid.Row="2" Background="{DynamicResource SurfaceBackgroundBrush}"
                   BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="12,0">
             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Border Classes="chip">
-                  <StackPanel Orientation="Horizontal" Spacing="2">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
                     <TextBlock Text="取景: " Classes="muted" />
                     <TextBlock x:Name="TxtPreviewMetrics" Text="未启用" FontSize="11" FontWeight="SemiBold" />
                   </StackPanel>
                 </Border>
                 <Border Classes="chip">
-                  <StackPanel Orientation="Horizontal" Spacing="2">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
                     <TextBlock Text="状态: " Classes="muted" />
-                    <TextBlock x:Name="StatusText" Text="Ready" FontSize="11" FontWeight="SemiBold" />
+                    <TextBlock x:Name="StatusText" Text="就绪" FontSize="11" FontWeight="SemiBold" />
                   </StackPanel>
                 </Border>
                 <Border Classes="chip">
@@ -271,17 +424,28 @@
                              FontFamily="Cascadia Code, Consolas, monospace" Classes="muted" />
                 </Border>
               </StackPanel>
-              <TextBlock Grid.Column="1" Text="FlashCap · PP-OCRv6" FontSize="11"
-                         FontFamily="Cascadia Code, Consolas, monospace" Classes="muted" />
+
+              <Border Grid.Column="1" Classes="chip">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <Path Data="{StaticResource GeoChip}" Fill="{DynamicResource TextMutedBrush}" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                  <TextBlock Text="TurboJPEG · BGR24 · SimdPaddle" FontSize="11"
+                             FontFamily="Cascadia Code, Consolas, monospace" Classes="muted" VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
             </Grid>
           </Border>
         </Grid>
       </Border>
 
-      <!-- Results -->
-      <Border Grid.Column="1" Classes="panel-card" Padding="12">
-        <Grid RowDefinitions="Auto,Auto,*,Auto">
-          <Grid Margin="0,0,0,8" ColumnDefinitions="*,Auto">
+      <!-- Grid Splitter -->
+      <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                    Background="Transparent" />
+
+      <!-- Results Panel -->
+      <Border Grid.Column="2" Classes="panel-card" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <!-- Header -->
+          <Grid Grid.Row="0" Margin="0,0,0,8" ColumnDefinitions="*,Auto">
             <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
               <TextBlock Text="识别结果" Classes="section-title" />
               <Border Classes="chip">
@@ -289,12 +453,26 @@
                            FontFamily="Cascadia Code, Consolas, monospace" />
               </Border>
             </StackPanel>
-            <Button Grid.Column="1" Classes="outline" Height="28" Content="清空" Click="OnClearResults" />
+            <Button Grid.Column="1" Classes="danger-soft" Height="28" Padding="8,2" Click="OnClearResults" ToolTip.Tip="清空识别结果列表">
+              <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <Path Data="{StaticResource GeoTrash}" Fill="{DynamicResource DangerTextBrush}" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="清空" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
           </Grid>
 
-          <TextBox x:Name="ResultSearchBox" Grid.Row="1" PlaceholderText="搜索结果…" Height="30" Margin="0,0,0,8"
-                   TextChanged="OnResultSearchChanged" />
+          <!-- Search Filter Box -->
+          <Grid Grid.Row="1" Margin="0,0,0,8">
+            <TextBox x:Name="ResultSearchBox" PlaceholderText="搜索结果…" Height="32"
+                     TextChanged="OnResultSearchChanged">
+              <TextBox.InnerLeftContent>
+                <Path Data="{StaticResource GeoSearch}" Fill="{DynamicResource TextMutedBrush}"
+                      Width="13" Height="13" Stretch="Uniform" Margin="9,0,4,0" VerticalAlignment="Center" />
+              </TextBox.InnerLeftContent>
+            </TextBox>
+          </Grid>
 
+          <!-- Results List + Inspector -->
           <Grid Grid.Row="2" RowDefinitions="*,110" RowSpacing="8">
             <Border Grid.Row="0" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" />
@@ -302,23 +480,38 @@
                      Background="Transparent" BorderThickness="0">
               <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="models:ScanResultItem">
-                  <StackPanel Margin="4,2" Spacing="2">
-                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                      <TextBlock Text="{Binding Time}" Classes="muted" FontSize="10" />
-                      <TextBlock Text="{Binding ConfidenceDisplay}" Classes="muted" FontSize="10" />
-                    </StackPanel>
-                  </StackPanel>
+                  <Border Classes="panel-card" Margin="2,3" Padding="8,6" Background="{DynamicResource SurfaceBackgroundBrush}">
+                    <Grid RowDefinitions="Auto,Auto">
+                      <!-- Top row: Badge, Timestamp, Confidence, Copy -->
+                      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,4">
+                        <Border Classes="chip" Background="{DynamicResource SymbologyBadgeOcrBgBrush}" BorderBrush="{DynamicResource SymbologyBadgeOcrBorderBrush}">
+                          <TextBlock Text="OCR" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SymbologyBadgeOcrTextBrush}" />
+                        </Border>
+                        <TextBlock Grid.Column="1" Text="{Binding Time}" Classes="muted" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{Binding ConfidenceDisplay}" Classes="muted" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center" />
+                        <Button Grid.Column="3" Classes="ghost" Width="22" Height="20" Padding="0"
+                                ToolTip.Tip="复制此条文本" Tag="{Binding}" Click="OnCopyResultItem">
+                          <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.2" Width="10" Height="10" Stretch="Uniform" />
+                        </Button>
+                      </Grid>
+                      <!-- Text content -->
+                      <TextBlock Grid.Row="1" Text="{Binding Text}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                    </Grid>
+                  </Border>
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
+
+            <!-- Empty Results Placeholder -->
             <StackPanel x:Name="PanelEmptyResults" Grid.Row="0" HorizontalAlignment="Center"
                         VerticalAlignment="Center" Spacing="8" IsHitTestVisible="False">
-              <TextBlock Text="▥" FontSize="36" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" />
+              <Path Data="{StaticResource GeoSearch}" Fill="{DynamicResource TextMutedBrush}" Width="28" Height="28" Stretch="Uniform" HorizontalAlignment="Center" Opacity="0.5" />
               <TextBlock Text="等待识别数据" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" />
               <TextBlock Text="将文字置于相机取景区内，结果将在此实时呈现"
                          Classes="muted" FontSize="11" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="270" />
             </StackPanel>
+
+            <!-- Details / Inspector Card -->
             <Border Grid.Row="1" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
                     BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="8">
               <StackPanel Spacing="4">
@@ -332,64 +525,87 @@
               </StackPanel>
             </Border>
           </Grid>
-
-          <Expander Grid.Row="3" Header="高级输出与运行日志" IsExpanded="False" Margin="0,8,0,0">
-          <StackPanel Spacing="8">
-          <Border Classes="panel-card" Padding="10"
-                  Background="{DynamicResource SurfaceSubtleBackgroundBrush}">
-            <StackPanel Spacing="6">
-              <TextBlock Text="输出（快捷）" FontSize="12" FontWeight="SemiBold" />
-              <StackPanel Orientation="Horizontal" Spacing="10">
-                <RadioButton x:Name="SinkNone" Content="关" GroupName="Sink" IsChecked="True" />
-                <RadioButton x:Name="SinkKeyboard" Content="键盘" GroupName="Sink" />
-                <RadioButton x:Name="SinkMqtt" Content="MQTT" GroupName="Sink" />
-                <RadioButton x:Name="SinkTcp" Content="TCP" GroupName="Sink" />
-                <Button Classes="outline" Height="26" Content="应用" Click="OnApplyOutput" />
-                <Button x:Name="SendOutputButton" Classes="primary" Height="26" Content="发送" Click="OnSendOutput" IsEnabled="False" />
-              </StackPanel>
-              <Grid ColumnDefinitions="Auto,*,Auto,*" ColumnSpacing="6" RowDefinitions="Auto,Auto" RowSpacing="4">
-                <TextBlock Classes="muted" VerticalAlignment="Center" Text="目标" />
-                <TextBox x:Name="KeyboardTarget" Grid.Column="1" Text="notepad.exe" Height="26" />
-                <TextBlock Grid.Column="2" Classes="muted" VerticalAlignment="Center" Text="MQTT" />
-                <TextBox x:Name="MqttBroker" Grid.Column="3" Text="localhost" Height="26" />
-                <TextBlock Grid.Row="1" Classes="muted" VerticalAlignment="Center" Text="主题" />
-                <TextBox x:Name="MqttTopic" Grid.Row="1" Grid.Column="1" Text="scanflow-ocr/scans" Height="26" />
-                <TextBlock Grid.Row="1" Grid.Column="2" Classes="muted" VerticalAlignment="Center" Text="TCP" />
-                <StackPanel Grid.Row="1" Grid.Column="3" Orientation="Horizontal" Spacing="4">
-                  <TextBox x:Name="TcpHost" Width="90" Text="127.0.0.1" Height="26" />
-                  <TextBox x:Name="TcpPort" Width="60" Text="9100" Height="26" />
-                  <TextBox x:Name="MqttPort" Width="50" Text="1883" Height="26" IsVisible="False" />
-                </StackPanel>
-              </Grid>
-            </StackPanel>
-          </Border>
-
-          <DockPanel Height="120">
-            <TextBlock DockPanel.Dock="Top" Text="运行日志" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,4" />
-            <Border Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="2">
-              <TextBox x:Name="Log" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap"
-                       FontFamily="Cascadia Code, Consolas, monospace" FontSize="11"
-                       BorderThickness="0" Background="Transparent" />
-            </Border>
-          </DockPanel>
-          </StackPanel>
-          </Expander>
         </Grid>
       </Border>
     </Grid>
 
-    <Border Grid.Row="3" Background="{DynamicResource SurfaceBackgroundBrush}"
-            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="14,0">
-      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
-        <TextBlock x:Name="TxtFooterHint" Text="ScanFlow-OCR · PP-OCRv6 · 跨平台 OCR 工作台" Classes="muted" />
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0">
-          <TextBlock x:Name="TxtOutputQueueStatus" Text="输出未启用" Classes="muted" VerticalAlignment="Center" />
-          <Button x:Name="BtnClearOutputQueue" Classes="ghost" Height="24" Content="清空队列"
-                  Click="OnClearOutputQueue" IsEnabled="False" />
-        </StackPanel>
-        <TextBlock Grid.Column="2" Text="Avalonia 12.1.2" Classes="muted" />
+    <!-- 4: Bottom Log Drawer -->
+    <Border Grid.Row="4" x:Name="DrawerLog" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
+      <Grid RowDefinitions="28,Auto">
+        <!-- Log Drawer Header Bar (28px) -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceSubtleBackgroundBrush}" Padding="12,0">
+          <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+            <!-- Left Clickable Toggle Area: Icon + Title + Line Count Badge -->
+            <Button Grid.Column="0" Classes="ghost" Height="26" HorizontalAlignment="Left" Padding="4,2" Click="OnToggleLogDrawer" ToolTip.Tip="点击展开 / 收起运行日志抽屉">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <Path Data="{StaticResource GeoTerminal}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" />
+                <TextBlock Text="运行日志" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Border Classes="chip" Padding="5,1">
+                  <TextBlock x:Name="TxtLogLineCount" Text="0 行" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
+                </Border>
+              </StackPanel>
+            </Button>
+
+            <!-- Right Actions: Copy, Clear, and Chevron Toggle -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+              <Button Classes="ghost" Height="24" Padding="6,2" Click="OnCopyLog" ToolTip.Tip="复制全部运行日志">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2" Width="10" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                  <TextBlock Text="复制" FontSize="11" Classes="muted" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <Button Classes="danger-soft" Height="24" Padding="6,2" Click="OnClearLog" ToolTip.Tip="清空运行日志">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <Path Data="{StaticResource GeoTrash}" Fill="{DynamicResource DangerTextBrush}" Width="10" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                  <TextBlock Text="清空" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <Border Width="1" Height="12" Background="{DynamicResource BorderSubtleBrush}" Margin="2,0" VerticalAlignment="Center" />
+              <Button Classes="ghost" Width="26" Height="24" Padding="0" Click="OnToggleLogDrawer" ToolTip.Tip="展开 / 收起抽屉">
+                <Path x:Name="PathLogDrawerChevron" Data="{StaticResource GeoChevronUp}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="9" Height="9" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center" />
+              </Button>
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- Drawer Body Tray (Only log display) -->
+        <Border Grid.Row="1" x:Name="LogDrawerBody" IsVisible="False" Height="120"
+                Background="{DynamicResource SurfaceBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
+          <TextBox x:Name="Log" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap"
+                   FontFamily="Cascadia Code, Consolas, monospace" FontSize="11"
+                   BorderThickness="0" Background="Transparent" Padding="12,6" />
+        </Border>
       </Grid>
     </Border>
-  </Grid>
+
+    <!-- 5: Status Footer (28px) -->
+    <Border Grid.Row="5" Background="{DynamicResource SurfaceBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="14,0">
+      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Ellipse x:Name="DotFooterStatus" Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" />
+          <TextBlock x:Name="TxtFooterHint" Text="ScanFlow-OCR · PP-OCRv6 · 跨平台 OCR 工作台" Classes="muted" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel x:Name="PanelOutputQueueIndicator" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0" Spacing="4">
+          <Button x:Name="BtnOutputStatusPill" Classes="ghost" Height="24" Padding="6,2"
+                  Click="OnOutputStatusPillClick" ToolTip.Tip="点击打开数据输出设置">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="5">
+              <Ellipse x:Name="DotOutputStatus" Width="6" Height="6" Fill="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+              <TextBlock x:Name="TxtOutputSinkName" Text="输出未启用" FontSize="11" Foreground="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+              <TextBlock x:Name="TxtOutputPendingCount" Text="" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button x:Name="BtnClearOutputQueue" Content="清空队列" Classes="outline"
+                  Height="22" Padding="6,1" FontSize="11" VerticalAlignment="Center"
+                  Click="OnClearOutputQueue" ToolTip.Tip="清空输出队列中全部待发送与待核对记录" IsEnabled="False" />
+          <TextBlock Text=" | " FontSize="11" Classes="muted" VerticalAlignment="Center" />
+        </StackPanel>
+        <TextBlock Grid.Column="2" Text="Avalonia 12.1.2" Classes="muted" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+
+    </Grid>
+  </Border>
 </Window>
