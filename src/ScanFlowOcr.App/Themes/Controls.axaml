@@ -223,13 +223,14 @@
     <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
   </Style>
 
-  <!-- Window Caption Buttons (42px tall, vertically stretch) -->
+  <!-- Window Caption Buttons: fixed 46×42 cells keep all glyphs on one center line -->
   <Style Selector="Button.caption">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="CornerRadius" Value="0" />
     <Setter Property="Width" Value="46" />
     <Setter Property="MinWidth" Value="46" />
+    <Setter Property="Height" Value="42" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="VerticalAlignment" Value="Stretch" />
     <Setter Property="Padding" Value="0" />
@@ -260,6 +261,7 @@
     <Setter Property="CornerRadius" Value="0" />
     <Setter Property="Width" Value="46" />
     <Setter Property="MinWidth" Value="46" />
+    <Setter Property="Height" Value="42" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="VerticalAlignment" Value="Stretch" />
     <Setter Property="Padding" Value="0" />

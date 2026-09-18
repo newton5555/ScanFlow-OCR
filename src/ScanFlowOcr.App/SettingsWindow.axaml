@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ScanFlowOcr.App.SettingsWindow"
         Title="系统设置 · ScanFlow-OCR"
-        Width="740" Height="680"
-        MinWidth="620" MinHeight="520"
+        Width="680" Height="620"
+        MinWidth="580" MinHeight="500"
         WindowStartupLocation="CenterOwner"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="-1"
@@ -32,11 +32,11 @@
           </StackPanel>
 
           <!-- Right: Close Button -->
-          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
+          <Grid Grid.Column="2" Width="46" Height="42" VerticalAlignment="Center">
             <Button x:Name="BtnCloseWindow" Classes="caption-close" ToolTip.Tip="关闭" Click="OnCloseWindowClick">
               <Path Data="{StaticResource GeoWindowClose}" Width="10" Height="10" Stretch="Uniform" />
             </Button>
-          </StackPanel>
+          </Grid>
         </Grid>
       </Border>
 
@@ -72,7 +72,7 @@
                   </StackPanel>
                   <TextBlock Text="选择用于 OCR 连续采样的物理相机或图像输入源及对应工作模式" Classes="muted" />
 
-                  <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10" Margin="0,4,0,0">
+                  <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10" Margin="0,4,0,0">
                     <TextBlock VerticalAlignment="Center" Classes="muted" Text="选择设备" />
                     <ComboBox x:Name="SettingsCameraDeviceCombo" Grid.Column="1" Height="32"
                               SelectionChanged="OnSettingsCameraDeviceChanged" />
@@ -154,7 +154,7 @@
                     <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="版式布局" />
                     <ComboBox x:Name="CmbOcrLayout" Grid.Row="2" Grid.Column="1" Width="220" SelectedIndex="0" Height="30">
                       <ComboBoxItem Content="文本块 (多行区域)" Tag="TextBlock" />
-                      <ComboBoxItem Content="单行 (单据单行条形码/字符)" Tag="SingleLine" />
+                      <ComboBoxItem Content="单行（单据单行字符）" Tag="SingleLine" />
                     </ComboBox>
                   </Grid>
 
@@ -450,16 +450,17 @@
               CornerRadius="4" Padding="10,6" IsVisible="False">
         <TextBlock x:Name="TxtError" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" FontWeight="SemiBold" FontSize="12" />
       </Border>
-      <TextBlock x:Name="TxtPath" Classes="muted" TextWrapping="Wrap" FontSize="11" />
+      <TextBlock x:Name="TxtPath" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
     </StackPanel>
 
     <!-- 4: Actions Footer -->
     <Border Grid.Row="4" Background="{DynamicResource SurfaceBackgroundBrush}"
             BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="16,10">
-      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-        <Button Classes="outline" Content="取消" Click="OnCancel" Width="88" Height="34" />
-        <Button Classes="primary" Content="应用并保存" Click="OnSave" Width="110" Height="34" />
-      </StackPanel>
+      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+        <TextBlock Classes="muted" Text="修改草稿将在点击应用后生效" FontSize="11" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Classes="outline" Content="取消" Click="OnCancel" Width="88" Height="34" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Classes="primary" Content="应用并保存" Click="OnSave" Width="110" Height="34" />
+      </Grid>
     </Border>
 
     </Grid>

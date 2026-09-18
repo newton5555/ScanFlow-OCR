@@ -50,7 +50,10 @@ public partial class SettingsWindow : Window
         LoadFromDraft();
         RefreshOutputStatus();
         if (TxtPath is not null && !string.IsNullOrEmpty(activePath))
-            TxtPath.Text = $"配置文件: {activePath}";
+        {
+            TxtPath.Text = $"配置文件 · {System.IO.Path.GetFileName(activePath)}";
+            ToolTip.SetTip(TxtPath, activePath);
+        }
 
         if (OperatingSystem.IsLinux())
         {
