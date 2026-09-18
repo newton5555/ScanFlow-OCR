@@ -1,4 +1,16 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="THIRD-PARTY-NOTICES.md" />
+  </Folder>
+  <Folder Name="/docs/">
+    <File Path="docs/LOCAL-AGENT-HANDOFF.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />
     <Project Path="src/ScanFlowOcr.Imaging/ScanFlowOcr.Imaging.csproj" />
@@ -14,5 +26,14 @@
   <Folder Name="/vendor/">
     <Project Path="src/ScanFlowOcr.Capture.FlashCap/vendor/FlashCap/FlashCap.Core/FlashCap.Core.Local.csproj" />
     <Project Path="src/ScanFlowOcr.Capture.FlashCap/vendor/FlashCap/FlashCap/FlashCap.Local.csproj" />
+  </Folder>
+  <Folder Name="/native/">
+    <File Path="native/ORIGIN.md" />
+  </Folder>
+  <Folder Name="/native/win-x64/">
+    <File Path="native/win-x64/turbojpeg.dll" />
+  </Folder>
+  <Folder Name="/native/linux-x64/">
+    <File Path="native/linux-x64/libturbojpeg.so" />
   </Folder>
 </Solution>
