@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
@@ -253,9 +254,14 @@ public partial class MainWindow : Window, IAsyncDisposable
             _preview = new CameraPreviewController(
                 Append,
                 SetCameraError,
-                bmp => PreviewImage.Source = bmp,
+                bmp =>
+                {
+                    // Controller already posts to UIThread; keep assignment explicit.
+                    PreviewImage.Source = bmp;
+                },
                 () =>
                 {
+                    // Called from controller on UIThread after stop/dispose races settle.
                     StartPreviewButton.IsEnabled = true;
                     StopPreviewButton.IsEnabled = false;
                     OcrFrameButton.IsEnabled = false;
@@ -533,16 +539,37 @@ public partial class MainWindow : Window, IAsyncDisposable
         OcrFrameButton.IsEnabled = enabled && previewing;
     }
 
-    private void SetStatus(string text) => StatusText.Text = text;
+    private void SetStatus(string text)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => SetStatus(text));
+            return;
+        }
+
+        StatusText.Text = text;
+    }
 
     private void SetCameraError(string text)
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => SetCameraError(text));
+            return;
+        }
+
         CameraErrorText.Text = text;
         CameraErrorText.IsVisible = !string.IsNullOrWhiteSpace(text);
     }
 
     private void Append(string line)
     {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => Append(line));
+            return;
+        }
+
         Log.Text = string.IsNullOrEmpty(Log.Text) ? line : Log.Text + Environment.NewLine + line;
         Log.CaretIndex = Log.Text?.Length ?? 0;
     }
