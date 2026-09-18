@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using FlashCap;
@@ -89,14 +90,27 @@ public sealed class FlashCapProvider : ICameraProvider
         {
             State = SourceState.Starting;
             _sequence = 0;
-            var layout = new ImageLayout(FrameEncoding.Jpeg, Contracts.PixelFormat.Unknown, mode.Width, mode.Height, [], ColorRange.Unspecified, ColorMatrix.Unspecified);
-            _capture = await descriptor.OpenAsync(characteristics, TranscodeFormats.DoNotTranscode, scope =>
+            var jpegLayout = new ImageLayout(FrameEncoding.Jpeg, Contracts.PixelFormat.Unknown, mode.Width, mode.Height, [], ColorRange.Unspecified, ColorMatrix.Unspecified);
+            _capture = await descriptor.OpenAsync(characteristics, TranscodeFormats.Auto, scope =>
             {
                 try
                 {
                     var bytes = scope.Buffer.ReferImage();
                     var stamp = new FrameStamp(new(streamEpoch, Interlocked.Increment(ref _sequence)), SourceId, mode.Width, mode.Height, Stopwatch.GetTimestamp(), scope.Buffer.Timestamp);
-                    receiver.OnFrame(new CapturedFrame(stamp, layout, bytes.AsSpan()));
+                    var image = bytes.AsSpan();
+                    if (IsJpeg(image))
+                    {
+                        receiver.OnFrame(new CapturedFrame(stamp, jpegLayout, image));
+                    }
+                    else if (TryConvertBitmapToBgra(image, mode.Width, mode.Height, out byte[] bgra, out string error))
+                    {
+                        var rawLayout = CreateBgraLayout(mode.Width, mode.Height);
+                        receiver.OnFrame(new CapturedFrame(stamp, rawLayout, bgra));
+                    }
+                    else
+                    {
+                        receiver.OnFault(new("CaptureFormat", error, true));
+                    }
                 }
                 catch (Exception ex) { receiver.OnFault(new("CaptureCallback", ex.Message, true)); }
                 finally { scope.ReleaseNow(); }
@@ -120,5 +134,88 @@ public sealed class FlashCapProvider : ICameraProvider
                 State = SourceState.Disposed;
             }
         }
+    }
+
+    private static ImageLayout CreateBgraLayout(int width, int height) =>
+        new(FrameEncoding.Raw, Contracts.PixelFormat.Bgra32, width, height,
+            [new PlaneLayout(0, checked(width * 4), checked(width * 4), height)],
+            ColorRange.Full, ColorMatrix.Unspecified);
+
+    private static bool IsJpeg(ReadOnlySpan<byte> image) =>
+        image.Length >= 2 && image[0] == 0xff && image[1] == 0xd8;
+
+    internal static bool TryConvertBitmapToBgra(
+        ReadOnlySpan<byte> image,
+        int expectedWidth,
+        int expectedHeight,
+        out byte[] bgra,
+        out string error)
+    {
+        bgra = [];
+        error = "";
+
+        const int bitmapFileHeaderSize = 14;
+        const int bitmapInfoHeaderMinimumSize = 40;
+        if (image.Length < bitmapFileHeaderSize + bitmapInfoHeaderMinimumSize ||
+            image[0] != (byte)'B' || image[1] != (byte)'M')
+        {
+            error = "相机返回的帧既不是 JPEG，也不是 FlashCap BMP。";
+            return false;
+        }
+
+        uint pixelOffset = BinaryPrimitives.ReadUInt32LittleEndian(image.Slice(10, 4));
+        uint infoHeaderSize = BinaryPrimitives.ReadUInt32LittleEndian(image.Slice(14, 4));
+        int width = BinaryPrimitives.ReadInt32LittleEndian(image.Slice(18, 4));
+        int signedHeight = BinaryPrimitives.ReadInt32LittleEndian(image.Slice(22, 4));
+        ushort planes = BinaryPrimitives.ReadUInt16LittleEndian(image.Slice(26, 2));
+        ushort bitsPerPixel = BinaryPrimitives.ReadUInt16LittleEndian(image.Slice(28, 2));
+        uint compression = BinaryPrimitives.ReadUInt32LittleEndian(image.Slice(30, 4));
+
+        long height = Math.Abs((long)signedHeight);
+        if (infoHeaderSize < bitmapInfoHeaderMinimumSize ||
+            width < 1 || height < 1 || height > int.MaxValue ||
+            width != expectedWidth || height != expectedHeight)
+        {
+            error = $"相机 BMP 尺寸无效：收到 {width}×{height}，协商为 {expectedWidth}×{expectedHeight}。";
+            return false;
+        }
+        if (planes != 1 || (bitsPerPixel != 24 && bitsPerPixel != 32) || compression != 0)
+        {
+            error = $"相机 BMP 像素格式不支持：{bitsPerPixel}bpp/compression={compression}。";
+            return false;
+        }
+
+        long sourceRowBytes = bitsPerPixel == 24
+            ? ((long)width * 3 + 3) & ~3L
+            : (long)width * 4;
+        long sourceBytes = checked(sourceRowBytes * height);
+        long sourceEnd = checked((long)pixelOffset + sourceBytes);
+        if (pixelOffset < bitmapFileHeaderSize + infoHeaderSize || sourceEnd > image.Length)
+        {
+            error = "相机 BMP 的像素数据超出帧缓冲区。";
+            return false;
+        }
+
+        int destinationStride = checked(width * 4);
+        bgra = new byte[checked(destinationStride * (int)height)];
+        bool bottomUp = signedHeight > 0;
+        int sourcePixelBytes = bitsPerPixel / 8;
+        for (int y = 0; y < (int)height; y++)
+        {
+            int sourceY = bottomUp ? (int)height - y - 1 : y;
+            var sourceRow = image.Slice(checked((int)(pixelOffset + sourceY * sourceRowBytes)), checked(width * sourcePixelBytes));
+            var destinationRow = bgra.AsSpan(y * destinationStride, destinationStride);
+            for (int x = 0; x < width; x++)
+            {
+                int sourceOffset = x * sourcePixelBytes;
+                int destinationOffset = x * 4;
+                destinationRow[destinationOffset] = sourceRow[sourceOffset];
+                destinationRow[destinationOffset + 1] = sourceRow[sourceOffset + 1];
+                destinationRow[destinationOffset + 2] = sourceRow[sourceOffset + 2];
+                destinationRow[destinationOffset + 3] = 255;
+            }
+        }
+
+        return true;
     }
 }

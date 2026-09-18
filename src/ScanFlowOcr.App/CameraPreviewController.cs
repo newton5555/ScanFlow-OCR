@@ -9,6 +9,7 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using ScanFlowOcr.Contracts;
 using ScanFlowOcr.Imaging;
+using ContractPixelFormat = ScanFlowOcr.Contracts.PixelFormat;
 
 namespace ScanFlowOcr.App;
 
@@ -16,7 +17,7 @@ internal readonly record struct CameraPreviewMetrics(
     long FramesReceived, long FramesDropped, long FramesDecoded);
 
 /// <summary>
-/// FlashCap MJPEG session → TurboJPEG BGRA decode → Avalonia preview bitmap.
+/// FlashCap camera session → JPEG/raw BGRA normalization → Avalonia preview bitmap.
 /// Decode runs off the UI thread; all WriteableBitmap / Image.Source / UI callbacks
 /// are marshaled to <see cref="Dispatcher.UIThread"/>. Drops frames when the previous
 /// decode is still in flight. Ignores in-flight work after stop/dispose.
@@ -159,8 +160,10 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
         if (Volatile.Read(ref _acceptFrames) == 0) return;
         Interlocked.Increment(ref _framesReceived);
         JpegDecoder? decoder = _decoder;
-        if (decoder is null) return;
-        if (frame.Layout.Encoding != FrameEncoding.Jpeg)
+        bool supported = frame.Layout.Encoding == FrameEncoding.Jpeg ||
+            (frame.Layout.Encoding == FrameEncoding.Raw &&
+             (frame.Layout.PixelFormat == ContractPixelFormat.Bgra32 || frame.Layout.PixelFormat == ContractPixelFormat.Bgr24));
+        if (!supported || (frame.Layout.Encoding == FrameEncoding.Jpeg && decoder is null))
         {
             Interlocked.Increment(ref _framesDropped);
             return;
@@ -171,7 +174,7 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
             return;
         }
 
-        byte[] jpeg = frame.Buffer.ToArray();
+        byte[] inputBytes = frame.Buffer.ToArray();
         var stamp = frame.Stamp;
         var layout = frame.Layout;
         int epoch = Volatile.Read(ref _previewEpoch);
@@ -187,9 +190,17 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
                     return;
                 }
 
-                var input = new ImageInput(stamp, layout, jpeg, ImageTransform.Identity);
-                using ImageLease bgraLease = decoder.DecodeBgra(input, _allocator);
-                byte[] bgra = bgraLease.WritableBuffer.ToArray();
+                var input = new ImageInput(stamp, layout, inputBytes, ImageTransform.Identity);
+                byte[] bgra;
+                if (layout.Encoding == FrameEncoding.Jpeg)
+                {
+                    using ImageLease bgraLease = decoder!.DecodeBgra(input, _allocator);
+                    bgra = bgraLease.WritableBuffer.ToArray();
+                }
+                else
+                {
+                    bgra = CopyRawToBgra(input);
+                }
                 int w = layout.Width;
                 int h = layout.Height;
                 int stride = w * 4;
@@ -251,13 +262,64 @@ internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
             catch (Exception ex)
             {
                 Interlocked.Increment(ref _framesDropped);
-                PostUi(() => _setError($"TurboJPEG decode failed: {ex.Message}"));
+                string prefix = layout.Encoding == FrameEncoding.Jpeg ? "TurboJPEG decode failed" : "Camera frame conversion failed";
+                PostUi(() => _setError($"{prefix}: {ex.Message}"));
             }
             finally
             {
                 Interlocked.Exchange(ref _decodeBusy, 0);
             }
         });
+    }
+
+    private static byte[] CopyRawToBgra(ImageInput input)
+    {
+        int width = input.Layout.Width;
+        int height = input.Layout.Height;
+        int sourcePixelBytes;
+        if (input.Layout.PixelFormat == ContractPixelFormat.Bgra32)
+        {
+            RawImages.ValidateBgra(input);
+            sourcePixelBytes = 4;
+        }
+        else if (input.Layout.PixelFormat == ContractPixelFormat.Bgr24)
+        {
+            RawImages.ValidateBgr(input);
+            sourcePixelBytes = 3;
+        }
+        else
+        {
+            throw new ArgumentException("预览只支持 BGR24/BGRA32 raw 相机帧。", nameof(input));
+        }
+
+        var plane = input.Layout.Planes[0];
+        int destinationStride = checked(width * 4);
+        byte[] result = new byte[checked(destinationStride * height)];
+        var source = input.Buffer.Span;
+        for (int y = 0; y < height; y++)
+        {
+            var sourceRow = source.Slice(checked(plane.Offset + y * plane.StrideBytes), checked(width * sourcePixelBytes));
+            var destinationRow = result.AsSpan(y * destinationStride, destinationStride);
+            if (sourcePixelBytes == 4)
+            {
+                sourceRow.CopyTo(destinationRow);
+                for (int x = 0; x < width; x++)
+                    destinationRow[x * 4 + 3] = 255;
+            }
+            else
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    int sourceOffset = x * 3;
+                    int destinationOffset = x * 4;
+                    destinationRow[destinationOffset] = sourceRow[sourceOffset];
+                    destinationRow[destinationOffset + 1] = sourceRow[sourceOffset + 1];
+                    destinationRow[destinationOffset + 2] = sourceRow[sourceOffset + 2];
+                    destinationRow[destinationOffset + 3] = 255;
+                }
+            }
+        }
+        return result;
     }
 
     public void OnFault(CaptureFault fault)

@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using ScanFlowOcr.Capture.FlashCap;
 using ScanFlowOcr.Contracts;
@@ -22,6 +23,33 @@ using (var lease = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 409
     Check(allocator.LiveBytes == 4096, "live bytes with retain");
 }
 Check(allocator.LiveBytes == 0, "live bytes after dispose");
+
+{
+    const int width = 2;
+    const int height = 2;
+    const int pixelOffset = 54;
+    const int sourceStride = 8;
+    byte[] bmp = new byte[pixelOffset + sourceStride * height];
+    bmp[0] = (byte)'B';
+    bmp[1] = (byte)'M';
+    BinaryPrimitives.WriteUInt32LittleEndian(bmp.AsSpan(2, 4), (uint)bmp.Length);
+    BinaryPrimitives.WriteUInt32LittleEndian(bmp.AsSpan(10, 4), pixelOffset);
+    BinaryPrimitives.WriteUInt32LittleEndian(bmp.AsSpan(14, 4), 40);
+    BinaryPrimitives.WriteInt32LittleEndian(bmp.AsSpan(18, 4), width);
+    BinaryPrimitives.WriteInt32LittleEndian(bmp.AsSpan(22, 4), height);
+    BinaryPrimitives.WriteUInt16LittleEndian(bmp.AsSpan(26, 2), 1);
+    BinaryPrimitives.WriteUInt16LittleEndian(bmp.AsSpan(28, 2), 24);
+
+    // Positive BMP height is bottom-up. The first source row is blue/white;
+    // the second source row is red/green and must become the visual top row.
+    new byte[] { 255, 0, 0, 255, 255, 255, 0, 0 }.AsSpan().CopyTo(bmp.AsSpan(pixelOffset, sourceStride));
+    new byte[] { 0, 0, 255, 0, 255, 0, 0, 0 }.AsSpan().CopyTo(bmp.AsSpan(pixelOffset + sourceStride, sourceStride));
+    Check(FlashCapProvider.TryConvertBitmapToBgra(bmp, width, height, out byte[] bgra, out _), "camera BMP conversion");
+    Check(bgra.AsSpan().SequenceEqual(new byte[] {
+        0, 0, 255, 255, 0, 255, 0, 255,
+        255, 0, 0, 255, 255, 255, 255, 255
+    }.AsSpan()), "camera BMP orientation and BGRA");
+}
 
 Check(new KeyboardRoute("notepad.exe").Validate() is null, "keyboard route ok");
 Check(new KeyboardRoute("bad/name").Validate() is not null, "keyboard route rejects path chars");
