@@ -2,96 +2,331 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ScanFlowOcr.App.MainWindow"
         Title="ScanFlow-OCR"
-        Width="1280" Height="800"
-        MinWidth="900" MinHeight="600">
-  <DockPanel Margin="12">
-    <!-- Toolbar -->
-    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
-      <Button x:Name="OpenImagesButton" Content="Open image(s)…" Click="OnOpenImages"/>
-      <Button x:Name="RunOcrButton" Content="Run OCR" Click="OnRunOcr" IsEnabled="False"/>
-      <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Text="Model:"/>
-      <ComboBox x:Name="ModelCombo" Width="110" SelectedIndex="0">
-        <ComboBoxItem Content="tiny"/>
-        <ComboBoxItem Content="small"/>
-      </ComboBox>
-      <TextBlock x:Name="StatusText" VerticalAlignment="Center" Margin="16,0,0,0"
-                 Text="Ready" Opacity="0.75"/>
-    </StackPanel>
+        Width="1240" Height="800"
+        MinWidth="960" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+  <Grid RowDefinitions="42,Auto,*,Auto,28">
 
-    <!-- Output config strip -->
-    <Border DockPanel.Dock="Bottom" Margin="0,10,0,0" Padding="10"
-            BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-            BorderThickness="1" CornerRadius="4">
-      <StackPanel Spacing="8">
-        <StackPanel Orientation="Horizontal" Spacing="12">
-          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Output sink:"/>
-          <RadioButton x:Name="SinkNone" Content="None" GroupName="Sink" IsChecked="True"/>
-          <RadioButton x:Name="SinkKeyboard" Content="Keyboard" GroupName="Sink"/>
-          <RadioButton x:Name="SinkMqtt" Content="MQTT" GroupName="Sink"/>
-          <RadioButton x:Name="SinkTcp" Content="TCP" GroupName="Sink"/>
-          <Button x:Name="ApplyOutputButton" Content="Apply output config" Click="OnApplyOutput" Margin="16,0,0,0"/>
-          <Button x:Name="SendOutputButton" Content="Send last OCR" Click="OnSendOutput" IsEnabled="False"/>
+    <!-- 0: In-app header (OS title bar kept — no custom WindowChrome) -->
+    <Border Grid.Row="0"
+            Background="{DynamicResource SurfaceBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderSubtleBrush}"
+            BorderThickness="0,0,0,1">
+      <Grid ColumnDefinitions="Auto,*,Auto" Margin="14,0,10,0">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandBrush}">
+            <TextBlock Text="SF" FontSize="10" FontWeight="Bold" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <TextBlock Text="ScanFlow-OCR" FontSize="16" FontWeight="SemiBold"
+                     Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+          <Border Classes="chip" VerticalAlignment="Center">
+            <TextBlock Text="桌面 OCR 工作台" Classes="muted" />
+          </Border>
         </StackPanel>
-        <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6">
-          <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Keyboard target"/>
-          <TextBox x:Name="KeyboardTarget" Grid.Row="0" Grid.Column="1" Text="notepad.exe" PlaceholderText="process / window class"/>
-          <TextBlock Grid.Row="0" Grid.Column="2" VerticalAlignment="Center" Text="MQTT broker"/>
-          <TextBox x:Name="MqttBroker" Grid.Row="0" Grid.Column="3" Text="localhost"/>
-          <TextBlock Grid.Row="0" Grid.Column="4" VerticalAlignment="Center" Text="MQTT port"/>
-          <TextBox x:Name="MqttPort" Grid.Row="0" Grid.Column="5" Text="1883" Width="80"/>
-          <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Text="MQTT topic"/>
-          <TextBox x:Name="MqttTopic" Grid.Row="1" Grid.Column="1" Text="scanflow-ocr/scans"/>
-          <TextBlock Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Text="TCP host"/>
-          <TextBox x:Name="TcpHost" Grid.Row="1" Grid.Column="3" Text="127.0.0.1"/>
-          <TextBlock Grid.Row="1" Grid.Column="4" VerticalAlignment="Center" Text="TCP port"/>
-          <TextBox x:Name="TcpPort" Grid.Row="1" Grid.Column="5" Text="9100" Width="80"/>
-        </Grid>
-      </StackPanel>
+
+        <Border Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                Classes="chip" Padding="10,3">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Ellipse x:Name="DotHeaderStatus" Width="6" Height="6"
+                     Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" />
+            <TextBlock Text="会话:" Classes="muted" VerticalAlignment="Center" />
+            <TextBlock x:Name="TxtHeaderSession" Text="服务已就绪" FontSize="11" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+
+        <Button Grid.Column="2" x:Name="ThemeToggleButton" Classes="ghost"
+                Width="32" Height="28" Padding="0"
+                ToolTip.Tip="切换浅色 / 深色主题"
+                Click="OnToggleTheme"
+                VerticalAlignment="Center" HorizontalAlignment="Right">
+          <TextBlock x:Name="ThemeToggleGlyph" Text="☀" FontSize="14"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Button>
+      </Grid>
     </Border>
 
-    <!-- Main: files | OCR/log | camera -->
-    <Grid ColumnDefinitions="220,*,360" ColumnSpacing="12">
-      <DockPanel Grid.Column="0">
-        <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Selected images"/>
-        <ListBox x:Name="ImageList" SelectionChanged="OnImageSelectionChanged"/>
-      </DockPanel>
-
-      <Grid Grid.Column="1" RowDefinitions="*,160" RowSpacing="10">
-        <DockPanel Grid.Row="0">
-          <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Recognized text"/>
-          <TextBox x:Name="OcrText" AcceptsReturn="True" TextWrapping="Wrap"
-                   FontFamily="Consolas, monospace" IsReadOnly="True"/>
-        </DockPanel>
-        <DockPanel Grid.Row="1">
-          <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Log"/>
-          <TextBox x:Name="Log" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap"
-                   FontFamily="Consolas, monospace"/>
-        </DockPanel>
-      </Grid>
-
-      <Border Grid.Column="2" Padding="10"
-              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
-              BorderThickness="1" CornerRadius="4">
-        <DockPanel>
-          <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,8" Text="Camera preview (MJPEG + TurboJPEG)"/>
-          <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
-            <Button x:Name="RefreshCamerasButton" Content="Refresh devices" Click="OnRefreshCameras" HorizontalAlignment="Stretch"/>
-            <TextBlock Text="Device"/>
-            <ComboBox x:Name="CameraDeviceCombo" HorizontalAlignment="Stretch" SelectionChanged="OnCameraDeviceChanged"/>
-            <TextBlock Text="MJPEG mode"/>
-            <ComboBox x:Name="CameraModeCombo" HorizontalAlignment="Stretch"/>
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <Button x:Name="StartPreviewButton" Content="Start" Click="OnStartPreview"/>
-              <Button x:Name="StopPreviewButton" Content="Stop" Click="OnStopPreview" IsEnabled="False"/>
-              <Button x:Name="OcrFrameButton" Content="OCR frame" Click="OnOcrCurrentFrame" IsEnabled="False"/>
+    <!-- 1: Workspace toolbar -->
+    <Border Grid.Row="1" Classes="panel-card" Margin="12,8,12,0" Padding="10,6" Height="52">
+      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+          <!-- Status pill -->
+          <Border x:Name="PillScanStatus" Classes="chip" Padding="8,4" Margin="0,0,10,0"
+                  Height="32" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Ellipse x:Name="DotState" Width="7" Height="7"
+                       Fill="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+              <TextBlock x:Name="TxtSessionState" Text="就绪" FontSize="11" FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
             </StackPanel>
-            <TextBlock x:Name="CameraErrorText" TextWrapping="Wrap" Foreground="#C62828" IsVisible="False"/>
-          </StackPanel>
-          <Border Background="#1A1A1A" CornerRadius="2" ClipToBounds="True">
-            <Image x:Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
-        </DockPanel>
+
+          <Border Width="1" Height="20" Background="{DynamicResource BorderSubtleBrush}"
+                  Margin="0,0,10,0" VerticalAlignment="Center" />
+
+          <!-- Source: camera -->
+          <TextBlock Text="输入源:" Classes="muted" VerticalAlignment="Center" Margin="0,0,6,0" />
+          <ComboBox x:Name="CameraDeviceCombo" MinWidth="160" MaxWidth="240" Height="32"
+                    VerticalAlignment="Center" Margin="0,0,6,0"
+                    SelectionChanged="OnCameraDeviceChanged" />
+          <ComboBox x:Name="CameraModeCombo" MinWidth="150" MaxWidth="220" Height="32"
+                    VerticalAlignment="Center" Margin="0,0,6,0" />
+          <Button x:Name="RefreshCamerasButton" Classes="outline" Height="32" Margin="0,0,8,0"
+                  Content="刷新" Click="OnRefreshCameras" ToolTip.Tip="刷新相机设备" />
+
+          <Border Width="1" Height="20" Background="{DynamicResource BorderSubtleBrush}"
+                  Margin="0,0,8,0" VerticalAlignment="Center" />
+
+          <!-- Images + model -->
+          <Button x:Name="OpenImagesButton" Classes="outline" Height="32" Margin="0,0,6,0"
+                  Content="导入图片…" Click="OnOpenImages" />
+          <TextBlock Text="模型:" Classes="muted" VerticalAlignment="Center" Margin="0,0,4,0" />
+          <ComboBox x:Name="ModelCombo" Width="90" Height="32" SelectedIndex="0"
+                    VerticalAlignment="Center" Margin="0,0,8,0">
+            <ComboBoxItem Content="tiny" />
+            <ComboBoxItem Content="small" />
+          </ComboBox>
+          <Button x:Name="RunOcrButton" Classes="outline" Height="32"
+                  Content="识别图片" Click="OnRunOcr" IsEnabled="False" />
+        </WrapPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <Button x:Name="StartPreviewButton" Classes="primary" Height="34"
+                  Content="启动预览" Click="OnStartPreview" />
+          <Button x:Name="StopPreviewButton" Classes="outline" Height="34"
+                  Content="停止" Click="OnStopPreview" IsEnabled="False" />
+          <Button x:Name="OcrFrameButton" Classes="outline" Height="34"
+                  Content="识别当前帧" Click="OnOcrCurrentFrame" IsEnabled="False" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- 2: Main workspace — viewport (prominent) + results -->
+    <Grid Grid.Row="2" Margin="12,8,12,8" ColumnSpacing="0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="13*" MinWidth="480" />
+        <ColumnDefinition Width="6*" MinWidth="320" MaxWidth="560" />
+      </Grid.ColumnDefinitions>
+
+      <!-- Viewport card -->
+      <Border Grid.Column="0" Classes="panel-card" ClipToBounds="True" Margin="0,0,6,0">
+        <Grid RowDefinitions="*,Auto,30">
+          <Grid Grid.Row="0" Background="{DynamicResource ViewportBackgroundBrush}">
+            <Image x:Name="PreviewImage" Stretch="Uniform"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+            <!-- Placeholder when idle -->
+            <Panel x:Name="PanelPlaceholder" IsVisible="True">
+              <Border Width="360" Height="220" HorizontalAlignment="Center" VerticalAlignment="Center"
+                      BorderBrush="{DynamicResource ReticleGridBrush}" BorderThickness="1"
+                      CornerRadius="4" Opacity="0.85">
+                <Panel>
+                  <Ellipse Width="140" Height="140" Stroke="{DynamicResource ReticleGridBrush}"
+                           StrokeThickness="1" StrokeDashArray="3,3"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Ellipse Width="90" Height="90" Stroke="{DynamicResource ReticleGridBrush}"
+                           StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Opacity="0.8" />
+                  <Border Background="{DynamicResource ViewportOverlayBackgroundBrush}"
+                          BorderBrush="{DynamicResource ViewportOverlayBorderBrush}"
+                          BorderThickness="1" CornerRadius="6" Padding="16,10"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,70,0,0">
+                    <StackPanel HorizontalAlignment="Center" Spacing="4">
+                      <TextBlock x:Name="TxtPlaceholderTitle" Text="未启动预览" FontWeight="SemiBold"
+                                 FontSize="14" HorizontalAlignment="Center"
+                                 Foreground="{DynamicResource TextPrimaryBrush}" />
+                      <TextBlock x:Name="TxtPlaceholderSub"
+                                 Text="选择相机与模式后点击【启动预览】，或导入图片后识别"
+                                 FontSize="11" HorizontalAlignment="Center" TextWrapping="Wrap"
+                                 TextAlignment="Center" MaxWidth="280"
+                                 Foreground="{DynamicResource TextMutedBrush}" />
+                    </StackPanel>
+                  </Border>
+                </Panel>
+              </Border>
+            </Panel>
+
+            <!-- HUD -->
+            <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12"
+                    Background="{DynamicResource ViewportOverlayBackgroundBrush}"
+                    BorderBrush="{DynamicResource ViewportOverlayBorderBrush}"
+                    BorderThickness="1" CornerRadius="12" Padding="10,4">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Ellipse x:Name="DotHudLive" Width="6" Height="6"
+                         Fill="{DynamicResource TextMutedBrush}" VerticalAlignment="Center" />
+                <TextBlock x:Name="TxtHudTitle" Text="取景预览" FontSize="11" FontWeight="SemiBold"
+                           FontFamily="Cascadia Code, Consolas, monospace"
+                           Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+
+            <TextBlock x:Name="CameraErrorText" Margin="12,40,12,12"
+                       HorizontalAlignment="Left" VerticalAlignment="Top"
+                       TextWrapping="Wrap" MaxWidth="420"
+                       Foreground="{DynamicResource DangerBrush}" IsVisible="False" />
+          </Grid>
+
+          <!-- Image playlist drawer -->
+          <Border Grid.Row="1"
+                  Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
+                  BorderBrush="{DynamicResource BorderSubtleBrush}"
+                  BorderThickness="0,1,0,0">
+            <Grid RowDefinitions="28,*">
+              <Border Grid.Row="0" Padding="10,0">
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                  <TextBlock Text="图像列表" FontSize="11" FontWeight="SemiBold"
+                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                  <Border Classes="chip">
+                    <TextBlock x:Name="TxtImageCount" Text="0 张" FontSize="11"
+                               FontFamily="Cascadia Code, Consolas, monospace"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                  </Border>
+                </StackPanel>
+              </Border>
+              <ListBox x:Name="ImageList" Grid.Row="1" MaxHeight="88"
+                       SelectionChanged="OnImageSelectionChanged"
+                       Background="Transparent" BorderThickness="0"
+                       Margin="6,0,6,6" />
+            </Grid>
+          </Border>
+
+          <!-- Metrics bar -->
+          <Border Grid.Row="2"
+                  Background="{DynamicResource SurfaceBackgroundBrush}"
+                  BorderBrush="{DynamicResource BorderSubtleBrush}"
+                  BorderThickness="0,1,0,0"
+                  Padding="12,0">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Classes="chip">
+                  <StackPanel Orientation="Horizontal" Spacing="2">
+                    <TextBlock Text="取景: " Classes="muted" />
+                    <TextBlock x:Name="TxtPreviewMetrics" Text="未启用" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                  </StackPanel>
+                </Border>
+                <Border Classes="chip">
+                  <StackPanel Orientation="Horizontal" Spacing="2">
+                    <TextBlock Text="状态: " Classes="muted" />
+                    <TextBlock x:Name="StatusText" Text="Ready" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextSecondaryBrush}" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+              <Border Grid.Column="1" Classes="chip">
+                <TextBlock Text="TurboJPEG · MJPEG · OCR" FontSize="11"
+                           FontFamily="Cascadia Code, Consolas, monospace"
+                           Foreground="{DynamicResource TextMutedBrush}" />
+              </Border>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+
+      <!-- Results panel -->
+      <Border Grid.Column="1" Classes="panel-card" Padding="12">
+        <Grid RowDefinitions="Auto,*,Auto,140">
+          <!-- Results header -->
+          <Grid Grid.Row="0" Margin="0,0,0,10" ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <TextBlock Text="识别结果" Classes="section-title" VerticalAlignment="Center" />
+              <Border Classes="chip">
+                <TextBlock x:Name="TxtResultCount" Text="0 行" FontSize="11"
+                           FontFamily="Cascadia Code, Consolas, monospace" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+              </Border>
+            </StackPanel>
+            <Button Grid.Column="1" x:Name="ClearResultsButton" Classes="outline" Height="28"
+                    Content="清空" Click="OnClearResults" ToolTip.Tip="清空识别文本与日志" />
+          </Grid>
+
+          <!-- OCR text -->
+          <Border Grid.Row="1" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
+                  BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                  CornerRadius="4" Padding="2" Margin="0,0,0,10">
+            <TextBox x:Name="OcrText" AcceptsReturn="True" TextWrapping="Wrap"
+                     FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
+                     IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                     PlaceholderText="OCR 文本将显示在这里" />
+          </Border>
+
+          <!-- Output settings -->
+          <Border Grid.Row="2" Classes="panel-card" Padding="10" Margin="0,0,0,10"
+                  Background="{DynamicResource SurfaceSubtleBackgroundBrush}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="输出路由" FontSize="12" FontWeight="SemiBold"
+                         Foreground="{DynamicResource TextPrimaryBrush}" />
+              <WrapPanel Orientation="Horizontal">
+                <RadioButton x:Name="SinkNone" Content="关闭" GroupName="Sink" IsChecked="True"
+                             Margin="0,0,12,4" />
+                <RadioButton x:Name="SinkKeyboard" Content="键盘" GroupName="Sink" Margin="0,0,12,4" />
+                <RadioButton x:Name="SinkMqtt" Content="MQTT" GroupName="Sink" Margin="0,0,12,4" />
+                <RadioButton x:Name="SinkTcp" Content="TCP" GroupName="Sink" Margin="0,0,12,4" />
+              </WrapPanel>
+              <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto"
+                    ColumnSpacing="8" RowSpacing="6">
+                <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Classes="muted"
+                           Text="键盘目标" />
+                <TextBox x:Name="KeyboardTarget" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="3"
+                         Text="notepad.exe" PlaceholderText="进程名 / 窗口类" Height="28" />
+                <TextBlock Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" Classes="muted"
+                           Text="MQTT" />
+                <TextBox x:Name="MqttBroker" Grid.Row="1" Grid.Column="1" Text="localhost" Height="28" />
+                <TextBlock Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Classes="muted"
+                           Text="端口" />
+                <TextBox x:Name="MqttPort" Grid.Row="1" Grid.Column="3" Text="1883" Height="28" Width="72" />
+                <TextBlock Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" Classes="muted"
+                           Text="主题" />
+                <TextBox x:Name="MqttTopic" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
+                         Text="scanflow-ocr/scans" Height="28" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" Classes="muted" Text="TCP" />
+                <TextBox x:Name="TcpHost" Grid.Column="1" Text="127.0.0.1" Height="28" />
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="端口" />
+                <TextBox x:Name="TcpPort" Grid.Column="3" Text="9100" Height="28" Width="72" />
+                <Button x:Name="ApplyOutputButton" Grid.Column="4" Classes="outline" Height="28"
+                        Content="应用" Click="OnApplyOutput" />
+                <Button x:Name="SendOutputButton" Grid.Column="5" Classes="primary" Height="28"
+                        Content="发送" Click="OnSendOutput" IsEnabled="False" />
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- Log -->
+          <DockPanel Grid.Row="3">
+            <TextBlock DockPanel.Dock="Top" Text="运行日志" FontSize="12" FontWeight="SemiBold"
+                       Margin="0,0,0,6" Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Border Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
+                    CornerRadius="4" Padding="2">
+              <TextBox x:Name="Log" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap"
+                       FontFamily="Cascadia Code, Consolas, monospace" FontSize="11"
+                       BorderThickness="0" Background="Transparent" />
+            </Border>
+          </DockPanel>
+        </Grid>
       </Border>
     </Grid>
-  </DockPanel>
+
+    <!-- 3: thin spacer / reserved (output already in results) — keep row for future banner -->
+    <Border Grid.Row="3" Height="0" IsVisible="False" />
+
+    <!-- 4: Status footer -->
+    <Border Grid.Row="4"
+            Background="{DynamicResource SurfaceBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderSubtleBrush}"
+            BorderThickness="0,1,0,0"
+            Padding="14,0">
+      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <TextBlock x:Name="TxtFooterHint" Text="ScanFlow-OCR · 仅 OCR（无条码码制界面）"
+                   Classes="muted" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="Avalonia 12.1.2 · Fluent"
+                   Classes="muted" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+  </Grid>
 </Window>

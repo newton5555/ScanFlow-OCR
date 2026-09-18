@@ -1,0 +1,44 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- ScanFlow dark charcoal tokens (ui-design-spec / DarkTheme.xaml) -->
+  <Color x:Key="AppBackgroundColor">#121518</Color>
+  <Color x:Key="SurfaceBackgroundColor">#1b1e23</Color>
+  <Color x:Key="SurfaceSubtleBackgroundColor">#1f2327</Color>
+  <Color x:Key="SurfaceHoverBackgroundColor">#242930</Color>
+  <Color x:Key="ViewportBackgroundColor">#0c0e10</Color>
+  <Color x:Key="BorderSubtleColor">#2f3540</Color>
+  <Color x:Key="BorderMediumColor">#3b434d</Color>
+  <Color x:Key="TextPrimaryColor">#f1f3f5</Color>
+  <Color x:Key="TextSecondaryColor">#adb5bd</Color>
+  <Color x:Key="TextMutedColor">#6c757d</Color>
+  <Color x:Key="BrandColor">#339af0</Color>
+  <Color x:Key="BrandHoverColor">#4dabf7</Color>
+  <Color x:Key="BrandSoftColor">#1a2733</Color>
+  <Color x:Key="SuccessColor">#10b981</Color>
+  <Color x:Key="WarningColor">#f59e0b</Color>
+  <Color x:Key="DangerColor">#ef4444</Color>
+  <Color x:Key="ViewportOverlayBgColor">#cc0c0e10</Color>
+  <Color x:Key="ViewportOverlayBorderColor">#3b434d</Color>
+  <Color x:Key="ReticleGridColor">#4a5560</Color>
+
+  <SolidColorBrush x:Key="AppBackgroundBrush" Color="{StaticResource AppBackgroundColor}" />
+  <SolidColorBrush x:Key="SurfaceBackgroundBrush" Color="{StaticResource SurfaceBackgroundColor}" />
+  <SolidColorBrush x:Key="SurfaceSubtleBackgroundBrush" Color="{StaticResource SurfaceSubtleBackgroundColor}" />
+  <SolidColorBrush x:Key="SurfaceHoverBackgroundBrush" Color="{StaticResource SurfaceHoverBackgroundColor}" />
+  <SolidColorBrush x:Key="ViewportBackgroundBrush" Color="{StaticResource ViewportBackgroundColor}" />
+  <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}" />
+  <SolidColorBrush x:Key="BorderMediumBrush" Color="{StaticResource BorderMediumColor}" />
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+  <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
+  <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}" />
+  <SolidColorBrush x:Key="BrandBrush" Color="{StaticResource BrandColor}" />
+  <SolidColorBrush x:Key="BrandHoverBrush" Color="{StaticResource BrandHoverColor}" />
+  <SolidColorBrush x:Key="BrandSoftBrush" Color="{StaticResource BrandSoftColor}" />
+  <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+  <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+  <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+  <SolidColorBrush x:Key="ViewportOverlayBackgroundBrush" Color="{StaticResource ViewportOverlayBgColor}" />
+  <SolidColorBrush x:Key="ViewportOverlayBorderBrush" Color="{StaticResource ViewportOverlayBorderColor}" />
+  <SolidColorBrush x:Key="ReticleGridBrush" Color="{StaticResource ReticleGridColor}" />
+  <SolidColorBrush x:Key="ReticleAccentBrush" Color="{StaticResource BrandColor}" />
+</ResourceDictionary>

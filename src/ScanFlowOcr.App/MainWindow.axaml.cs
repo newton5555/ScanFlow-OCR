@@ -9,7 +9,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
@@ -77,6 +79,30 @@ public partial class MainWindow : Window, IAsyncDisposable
         await _coordinator.DisposeAsync().ConfigureAwait(false);
     }
 
+
+    private void OnToggleTheme(object? sender, RoutedEventArgs e)
+    {
+        var app = Application.Current;
+        if (app is null) return;
+        bool toDark = app.RequestedThemeVariant != ThemeVariant.Dark;
+        app.RequestedThemeVariant = toDark ? ThemeVariant.Dark : ThemeVariant.Light;
+        if (ThemeToggleGlyph is not null)
+            ThemeToggleGlyph.Text = toDark ? "☾" : "☀";
+        Append(toDark ? "Theme: dark" : "Theme: light");
+    }
+
+    private void OnClearResults(object? sender, RoutedEventArgs e)
+    {
+        OcrText.Text = "";
+        Log.Text = "";
+        _lastLines = [];
+        _lastStamp = null;
+        SendOutputButton.IsEnabled = false;
+        TxtResultCount.Text = "0 行";
+        SetStatus("已清空结果");
+        Append("Cleared OCR text and log.");
+    }
+
     private async void OnOpenImages(object? sender, RoutedEventArgs e)
     {
         if (_busy) return;
@@ -116,6 +142,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 ImageList.SelectedIndex = 0;
 
             RunOcrButton.IsEnabled = _imagePaths.Count > 0;
+            TxtImageCount.Text = $"{_imagePaths.Count} 张";
             SetStatus($"Loaded {_imagePaths.Count} image(s).");
             Append($"Opened {_imagePaths.Count} file(s).");
         }
@@ -258,6 +285,8 @@ public partial class MainWindow : Window, IAsyncDisposable
                 {
                     // Controller already posts to UIThread; keep assignment explicit.
                     PreviewImage.Source = bmp;
+                    if (bmp is not null)
+                        PanelPlaceholder.IsVisible = false;
                 },
                 () =>
                 {
@@ -273,6 +302,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 StartPreviewButton.IsEnabled = false;
                 StopPreviewButton.IsEnabled = true;
                 OcrFrameButton.IsEnabled = true;
+                SetPreviewChrome(running: true);
                 SetStatus("Preview running.");
             }
             catch
@@ -298,6 +328,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             StartPreviewButton.IsEnabled = true;
             StopPreviewButton.IsEnabled = false;
             OcrFrameButton.IsEnabled = false;
+            SetPreviewChrome(running: false);
             SetStatus("Preview stopped.");
             Append("Camera preview stopped.");
         }).ConfigureAwait(true);
@@ -350,6 +381,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (batch.Status == StageStatus.Faulted)
         {
             OcrText.Text = "";
+            TxtResultCount.Text = "0 行";
             Append($"OCR faulted: {batch.Fault?.Code} {batch.Fault?.Message}");
             SetStatus("OCR faulted.");
             return;
@@ -367,6 +399,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
 
         OcrText.Text = sb.ToString().TrimEnd();
+        TxtResultCount.Text = $"{batch.Items.Length} 行";
         SetStatus($"OCR {batch.Status}: {batch.Items.Length} line(s) in {batch.EngineTime.TotalMilliseconds:0} ms.");
         Append($"Done: {batch.Items.Length} line(s), {batch.EngineTime.TotalMilliseconds:0} ms, status={batch.Status}.");
     }
@@ -548,6 +581,35 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
 
         StatusText.Text = text;
+        TxtSessionState.Text = text;
+        TxtHeaderSession.Text = text;
+    }
+
+    private void SetPreviewChrome(bool running)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => SetPreviewChrome(running));
+            return;
+        }
+
+        PanelPlaceholder.IsVisible = !running && PreviewImage.Source is null;
+        var success = ResolveBrush("SuccessBrush", Avalonia.Media.Brushes.LimeGreen);
+        var muted = ResolveBrush("TextMutedBrush", Avalonia.Media.Brushes.Gray);
+        DotHudLive.Fill = running ? success : muted;
+        DotState.Fill = running ? success : muted;
+        DotHeaderStatus.Fill = success;
+        TxtHudTitle.Text = running ? "实时画面" : "取景预览";
+        TxtPreviewMetrics.Text = running ? "预览中" : "未启用";
+    }
+
+    private static Avalonia.Media.IBrush ResolveBrush(string key, Avalonia.Media.IBrush fallback)
+    {
+        var app = Application.Current;
+        if (app is null) return fallback;
+        if (app.TryGetResource(key, app.ActualThemeVariant, out object? value) && value is Avalonia.Media.IBrush brush)
+            return brush;
+        return fallback;
     }
 
     private void SetCameraError(string text)
