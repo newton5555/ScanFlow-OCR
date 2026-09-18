@@ -28,6 +28,7 @@ Requires .NET SDK 10 (`global.json`).
 ```bash
 dotnet build ScanFlowOcr.slnx
 dotnet run --project tests/ScanFlowOcr.SmokeTests
+dotnet run --project tests/ScanFlowOcr.SmokeTests -- --camera  # optional Windows MF/MJPEG probe
 dotnet run --project src/ScanFlowOcr.App
 ```
 

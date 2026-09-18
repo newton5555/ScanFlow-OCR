@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />
+    <ProjectReference Include="../../src/ScanFlowOcr.Capture.FlashCap/ScanFlowOcr.Capture.FlashCap.csproj" />
     <ProjectReference Include="../../src/ScanFlowOcr.Imaging/ScanFlowOcr.Imaging.csproj" />
     <ProjectReference Include="../../src/ScanFlowOcr.Outputs/ScanFlowOcr.Outputs.csproj" />
     <ProjectReference Include="../../src/ScanFlowOcr.Ocr.SimdPaddle/ScanFlowOcr.Ocr.SimdPaddle.csproj" />

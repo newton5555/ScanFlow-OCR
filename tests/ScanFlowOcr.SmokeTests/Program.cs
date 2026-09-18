@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ScanFlowOcr.Capture.FlashCap;
 using ScanFlowOcr.Contracts;
 using ScanFlowOcr.Imaging;
 using ScanFlowOcr.Outputs;
@@ -71,5 +72,36 @@ Check(Enum.IsDefined(ScanFlowOcr.Contracts.DedupeMode.Session), "dedupe Session"
 Check(Enum.IsDefined(ScanFlowOcr.Contracts.DedupeMode.Cooldown), "dedupe Cooldown");
 Check(typeof(ScanFlowOcr.Runtime.ScanSession).IsClass, "ScanSession type present");
 
-Console.WriteLine("All smoke checks passed.");
+if (args.Any(static arg => string.Equals(arg, "--camera", StringComparison.OrdinalIgnoreCase)))
+{
+    Console.WriteLine("=== camera probe ===");
+    try
+    {
+        if (TurboJpegNative.TryResolveLibraryPath(out string? turboJpegPath, out string turboJpegError))
+            Console.WriteLine($"CAMERA TurboJPEG: {turboJpegPath}");
+        else
+            Console.WriteLine($"CAMERA TurboJPEG unavailable: {turboJpegError}");
+
+        var provider = new FlashCapProvider();
+        var cameras = await provider.EnumerateAsync(CancellationToken.None);
+        Console.WriteLine($"CAMERA devices: {cameras.Length}");
+        for (int i = 0; i < cameras.Length; i++)
+        {
+            var camera = cameras[i];
+            var modes = await provider.GetModesAsync(camera.Id, CancellationToken.None);
+            Console.WriteLine($"CAMERA[{i}] {camera.DisplayName} ({modes.Length} MJPEG mode(s))");
+            foreach (var mode in modes)
+                Console.WriteLine($"  MODE {mode.ModeId}: {mode.Width}x{mode.Height} @ {mode.FpsNumerator}/{Math.Max(1, mode.FpsDenominator)}");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"CAMERA probe failed: {ex.GetType().Name}: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
+}
+
+Console.WriteLine(Environment.ExitCode == 0
+    ? "All smoke checks passed."
+    : "Smoke checks passed, but the optional camera probe failed.");
 
