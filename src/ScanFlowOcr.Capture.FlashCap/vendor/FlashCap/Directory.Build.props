@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>FlashCap</RootNamespace>
+    <NoWarn>$(NoWarn);CS0649;CS8981</NoWarn>
+    <IsPackable>false</IsPackable>
+    <!-- MF on Windows; V4L2 path is always compiled and selected at runtime on Linux -->
+    <DefineConstants>$(DefineConstants);FLASHCAP_MEDIAFOUNDATION</DefineConstants>
+  </PropertyGroup>
+</Project>

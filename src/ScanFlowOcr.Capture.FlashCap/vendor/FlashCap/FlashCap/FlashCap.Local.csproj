@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AssemblyName>FlashCap</AssemblyName></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../FlashCap.Core/FlashCap.Core.Local.csproj" /></ItemGroup>
+</Project>

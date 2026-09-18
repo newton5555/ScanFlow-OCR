@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />
+    <Project Path="src/ScanFlowOcr.Imaging/ScanFlowOcr.Imaging.csproj" />
+    <Project Path="src/ScanFlowOcr.Capture.FlashCap/ScanFlowOcr.Capture.FlashCap.csproj" />
+    <Project Path="src/ScanFlowOcr.Ocr.SimdPaddle/ScanFlowOcr.Ocr.SimdPaddle.csproj" />
+    <Project Path="src/ScanFlowOcr.Outputs/ScanFlowOcr.Outputs.csproj" />
+    <Project Path="src/ScanFlowOcr.App/ScanFlowOcr.App.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ScanFlowOcr.SmokeTests/ScanFlowOcr.SmokeTests.csproj" />
+  </Folder>
+  <Folder Name="/vendor/">
+    <Project Path="src/ScanFlowOcr.Capture.FlashCap/vendor/FlashCap/FlashCap.Core/FlashCap.Core.Local.csproj" />
+    <Project Path="src/ScanFlowOcr.Capture.FlashCap/vendor/FlashCap/FlashCap/FlashCap.Local.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="vendor/**" />
+    <EmbeddedResource Remove="vendor/**" />
+    <None Remove="vendor/**" />
+    <None Include="vendor/FlashCap/LICENSE" Link="licenses/FlashCap/LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="vendor/FlashCap/ORIGIN.md" Link="licenses/FlashCap/ORIGIN.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <ProjectReference Include="../ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />
+    <ProjectReference Include="vendor/FlashCap/FlashCap/FlashCap.Local.csproj" />
+  </ItemGroup>
+</Project>
