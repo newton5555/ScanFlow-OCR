@@ -57,7 +57,7 @@ License: IJG + Modified BSD — see `THIRD-PARTY-NOTICES.md`. This software is b
 
 ### Linux camera
 
-FlashCap `CaptureDevices` selects V4L2. Process needs access to `/dev/video*`. App UI: refresh devices → pick MJPEG mode → Start preview (TurboJPEG decode) → optional OCR current frame.
+FlashCap `CaptureDevices` selects V4L2. Process needs access to `/dev/video*`. App UI: refresh devices → pick MJPEG mode → **启动扫描** (continuous OCR session) or **仅预览** → optional OCR current frame.
 
 ### MQTT / TCP outputs
 
@@ -71,15 +71,19 @@ Payloads are OCR-only JSON (`textLines`); no barcode fields. MQTT passwords use 
 
 ## Layout
 
+Matches `ScanFlowOcr.slnx`:
+
 ```
 src/ScanFlowOcr.Contracts
 src/ScanFlowOcr.Imaging
 src/ScanFlowOcr.Capture.FlashCap (+ vendor/FlashCap)
 src/ScanFlowOcr.Ocr.SimdPaddle
 src/ScanFlowOcr.Outputs
-src/ScanFlowOcr.App
+src/ScanFlowOcr.Runtime      # OCR-only ScanSession (dedupe + ROI crop)
+src/ScanFlowOcr.App          # Avalonia UI, settings, continuous scan
 tests/ScanFlowOcr.SmokeTests
 native/win-x64 native/linux-x64  (+ ORIGIN.md)
+docs/LOCAL-AGENT-HANDOFF.md  # handoff for Windows local agent
 ```
 
 ## Status
@@ -90,9 +94,10 @@ Phase 1 source migration is in the tree and **builds on Linux** with .NET SDK 10
 - Official **libjpeg-turbo 3.2.0** TurboJPEG libs under `native/`
 - `dotnet build ScanFlowOcr.slnx -c Release` — Contracts, Imaging, Capture.FlashCap (+ vendor), Ocr.SimdPaddle, Outputs, App, SmokeTests
 - `dotnet run --project tests/ScanFlowOcr.SmokeTests` — lease / still-JPEG / keyboard+MQTT+TCP route / coordinator configure / SimdPaddle metadata checks pass
-- Avalonia App: **Open image(s) → Run OCR**; **camera device/mode → live MJPEG preview (TurboJPEG) → optional OCR frame**; sinks via `OutputCoordinator`
+- Avalonia App: **settings persistence**; **continuous OCR scan session** (Runtime); **ROI overlay**; preview zoom/crosshair; results search/inspector; playlist thumbnails; still-image OCR; optional preview-only + frame OCR; MQTT/TCP/keyboard sinks
 
 ### Stubbed / deferred
 
 - Linux keyboard: ASCII (+ Tab/Enter) via `/dev/uinput`; non-ASCII returns `UnicodeUnsupported`
 - No OcrHost, clipboard, or AOT packing
+- Full in-viewport ROI drag editor, playlist-as-session-source, installers — see `docs/LOCAL-AGENT-HANDOFF.md`
