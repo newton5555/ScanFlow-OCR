@@ -1,0 +1,103 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ScanFlowOcr.App.SettingsWindow"
+        Title="设置 — ScanFlow-OCR"
+        Width="720" Height="640"
+        MinWidth="560" MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppBackgroundBrush}"
+        Foreground="{DynamicResource TextPrimaryBrush}">
+  <Grid RowDefinitions="*,Auto" Margin="16">
+    <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="14">
+        <TextBlock Text="OCR 与识别" Classes="section-title" />
+        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+          <TextBlock Grid.Row="0" VerticalAlignment="Center" Classes="muted" Text="模型" />
+          <ComboBox x:Name="ModelCombo" Grid.Row="0" Grid.Column="1" Width="160" SelectedIndex="0">
+            <ComboBoxItem Content="tiny" />
+            <ComboBoxItem Content="small" />
+          </ComboBox>
+          <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="OCR 超时 (ms)" />
+          <TextBox x:Name="OcrTimeoutBox" Grid.Row="1" Grid.Column="1" Width="120" Text="5000" />
+          <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="去重模式" />
+          <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="12">
+            <RadioButton x:Name="RbDedupeSession" Content="Session" GroupName="Dedupe" IsChecked="True" />
+            <RadioButton x:Name="RbDedupeCooldown" Content="Cooldown" GroupName="Dedupe" />
+            <RadioButton x:Name="RbDedupeUntilAbsent" Content="UntilAbsent" GroupName="Dedupe" />
+            <RadioButton x:Name="RbDedupeIntraFrame" Content="IntraFrame" GroupName="Dedupe" />
+          </StackPanel>
+          <TextBlock Grid.Row="3" VerticalAlignment="Center" Classes="muted" Text="冷却间隔 (ms)" />
+          <TextBox x:Name="DedupeIntervalBox" Grid.Row="3" Grid.Column="1" Width="120" Text="1500" />
+        </Grid>
+
+        <TextBlock Text="ROI 识别区域" Classes="section-title" Margin="0,8,0,0" />
+        <CheckBox x:Name="ChkEnableRoi" Content="启用 ROI（百分比，相对相机分辨率）" />
+        <CheckBox x:Name="ChkShowGuides" Content="预览显示准星 / 辅助线" IsChecked="True" />
+        <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*" ColumnSpacing="8" RowSpacing="6">
+          <TextBlock VerticalAlignment="Center" Classes="muted" Text="X%" />
+          <TextBox x:Name="RoiXBox" Grid.Column="1" Text="10" />
+          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="Y%" />
+          <TextBox x:Name="RoiYBox" Grid.Column="3" Text="10" />
+          <TextBlock Grid.Column="4" VerticalAlignment="Center" Classes="muted" Text="W%" />
+          <TextBox x:Name="RoiWBox" Grid.Column="5" Text="80" />
+          <TextBlock Grid.Column="6" VerticalAlignment="Center" Classes="muted" Text="H%" />
+          <TextBox x:Name="RoiHBox" Grid.Column="7" Text="80" />
+        </Grid>
+
+        <TextBlock Text="预览" Classes="section-title" Margin="0,8,0,0" />
+        <CheckBox x:Name="ChkPreviewEnabled" Content="启用会话预览帧" IsChecked="True" />
+        <Grid ColumnDefinitions="140,*,140,*" ColumnSpacing="10" RowSpacing="8">
+          <TextBlock VerticalAlignment="Center" Classes="muted" Text="预览 FPS" />
+          <TextBox x:Name="PreviewFpsBox" Grid.Column="1" Text="15" />
+          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="Max W/H (0=原图)" />
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+            <TextBox x:Name="PreviewMaxWBox" Width="70" Text="0" />
+            <TextBox x:Name="PreviewMaxHBox" Width="70" Text="0" />
+          </StackPanel>
+        </Grid>
+
+        <TextBlock Text="相机偏好" Classes="section-title" Margin="0,8,0,0" />
+        <Grid ColumnDefinitions="140,*,140,*" ColumnSpacing="10">
+          <TextBlock VerticalAlignment="Center" Classes="muted" Text="设备索引" />
+          <TextBox x:Name="PreferredCameraBox" Grid.Column="1" Text="0" />
+          <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="模式索引" />
+          <TextBox x:Name="PreferredModeBox" Grid.Column="3" Text="0" />
+        </Grid>
+
+        <TextBlock Text="输出路由（三选一）" Classes="section-title" Margin="0,8,0,0" />
+        <StackPanel Orientation="Horizontal" Spacing="14">
+          <RadioButton x:Name="RbOutNone" Content="关闭" GroupName="Out" IsChecked="True" />
+          <RadioButton x:Name="RbOutKeyboard" Content="键盘" GroupName="Out" />
+          <RadioButton x:Name="RbOutMqtt" Content="MQTT" GroupName="Out" />
+          <RadioButton x:Name="RbOutTcp" Content="TCP" GroupName="Out" />
+        </StackPanel>
+        <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="8">
+          <TextBlock VerticalAlignment="Center" Classes="muted" Text="键盘目标" />
+          <TextBox x:Name="KeyboardTargetBox" Grid.Column="1" Text="notepad.exe" />
+          <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="MQTT Broker" />
+          <TextBox x:Name="MqttBrokerBox" Grid.Row="1" Grid.Column="1" Text="localhost" />
+          <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="MQTT 端口 / 主题" />
+          <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="MqttPortBox" Width="80" Text="1883" />
+            <TextBox x:Name="MqttTopicBox" Width="280" Text="scanflow-ocr/scans" />
+          </StackPanel>
+          <TextBlock Grid.Row="3" VerticalAlignment="Center" Classes="muted" Text="TCP Host:Port" />
+          <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="TcpHostBox" Width="160" Text="127.0.0.1" />
+            <TextBox x:Name="TcpPortBox" Width="80" Text="9100" />
+          </StackPanel>
+          <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="muted" Text="队列容量" />
+          <TextBox x:Name="QueueCapacityBox" Grid.Row="4" Grid.Column="1" Width="120" Text="1000" />
+        </Grid>
+
+        <TextBlock x:Name="TxtError" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" IsVisible="False" />
+        <TextBlock x:Name="TxtPath" Classes="muted" TextWrapping="Wrap" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,12,0,0">
+      <Button Classes="outline" Content="取消" Click="OnCancel" Width="88" Height="34" />
+      <Button Classes="primary" Content="保存" Click="OnSave" Width="88" Height="34" />
+    </StackPanel>
+  </Grid>
+</Window>

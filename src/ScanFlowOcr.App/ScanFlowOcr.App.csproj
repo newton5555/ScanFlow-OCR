@@ -17,8 +17,13 @@
     <ProjectReference Include="../ScanFlowOcr.Capture.FlashCap/ScanFlowOcr.Capture.FlashCap.csproj" />
     <ProjectReference Include="../ScanFlowOcr.Ocr.SimdPaddle/ScanFlowOcr.Ocr.SimdPaddle.csproj" />
     <ProjectReference Include="../ScanFlowOcr.Outputs/ScanFlowOcr.Outputs.csproj" />
+    <ProjectReference Include="../ScanFlowOcr.Runtime/ScanFlowOcr.Runtime.csproj" />
   </ItemGroup>
-  <!-- Official libjpeg-turbo 3.2.0 TurboJPEG shared libs → output native/{rid}/ -->
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <ItemGroup>
     <None Include="..\..\native\win-x64\turbojpeg.dll" Link="native\win-x64\turbojpeg.dll" Condition="Exists('..\..\native\win-x64\turbojpeg.dll')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

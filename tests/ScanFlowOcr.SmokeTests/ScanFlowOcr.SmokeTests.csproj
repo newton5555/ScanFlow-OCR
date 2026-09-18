@@ -9,5 +9,6 @@
     <ProjectReference Include="../../src/ScanFlowOcr.Imaging/ScanFlowOcr.Imaging.csproj" />
     <ProjectReference Include="../../src/ScanFlowOcr.Outputs/ScanFlowOcr.Outputs.csproj" />
     <ProjectReference Include="../../src/ScanFlowOcr.Ocr.SimdPaddle/ScanFlowOcr.Ocr.SimdPaddle.csproj" />
+    <ProjectReference Include="../../src/ScanFlowOcr.Runtime/ScanFlowOcr.Runtime.csproj" />
   </ItemGroup>
 </Project>

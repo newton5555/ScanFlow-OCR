@@ -66,4 +66,10 @@ var sink = KeyboardOutputSink.Create(new KeyboardRoute("scanflow-smoke-target"))
 Check(sink.Descriptor.Id == "keyboard", "keyboard sink id");
 await sink.DisposeAsync();
 
+
+Check(Enum.IsDefined(ScanFlowOcr.Contracts.DedupeMode.Session), "dedupe Session");
+Check(Enum.IsDefined(ScanFlowOcr.Contracts.DedupeMode.Cooldown), "dedupe Cooldown");
+Check(typeof(ScanFlowOcr.Runtime.ScanSession).IsClass, "ScanSession type present");
+
 Console.WriteLine("All smoke checks passed.");
+

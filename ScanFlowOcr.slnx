@@ -5,6 +5,7 @@
     <Project Path="src/ScanFlowOcr.Capture.FlashCap/ScanFlowOcr.Capture.FlashCap.csproj" />
     <Project Path="src/ScanFlowOcr.Ocr.SimdPaddle/ScanFlowOcr.Ocr.SimdPaddle.csproj" />
     <Project Path="src/ScanFlowOcr.Outputs/ScanFlowOcr.Outputs.csproj" />
+    <Project Path="src/ScanFlowOcr.Runtime/ScanFlowOcr.Runtime.csproj" />
     <Project Path="src/ScanFlowOcr.App/ScanFlowOcr.App.csproj" />
   </Folder>
   <Folder Name="/tests/">
