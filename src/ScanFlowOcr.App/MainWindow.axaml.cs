@@ -11,6 +11,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
 using ScanFlowOcr.Capture.FlashCap;
 using ScanFlowOcr.Contracts;
@@ -25,6 +26,9 @@ public partial class MainWindow : Window, IAsyncDisposable
     private readonly List<string> _imagePaths = [];
     private readonly OutputCoordinator _coordinator;
     private readonly SimdPaddleOcrFactory _ocrFactory = new();
+    private readonly FlashCapProvider _cameraProvider = new();
+    private ImmutableArray<CameraDescriptor> _cameras = [];
+    private CameraPreviewController? _preview;
     private IOcrReader? _ocrReader;
     private string? _ocrReaderModel;
     private ImmutableArray<OcrLine> _lastLines = [];
@@ -35,9 +39,14 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         InitializeComponent();
         _coordinator = new OutputCoordinator();
-        Append("ScanFlow-OCR phase 1 — select image → OCR (SimdPaddle Tiny) → output.");
+        Append("ScanFlow-OCR — still images + camera MJPEG preview (TurboJPEG 3.2.0).");
         Append($"OS: {Environment.OSVersion}; 64-bit: {Environment.Is64BitProcess}");
+        if (TurboJpegNative.TryResolveLibraryPath(out string? tj, out string tjErr))
+            Append($"TurboJPEG OK: {tj}");
+        else
+            Append($"TurboJPEG not found yet (camera preview needs it): {tjErr}");
         Closed += OnClosed;
+        _ = RefreshCamerasAsync();
     }
 
     private bool _disposed;
@@ -54,6 +63,11 @@ public partial class MainWindow : Window, IAsyncDisposable
         _disposed = true;
         GC.SuppressFinalize(this);
         Closed -= OnClosed;
+        if (_preview is not null)
+        {
+            await _preview.DisposeAsync().ConfigureAwait(false);
+            _preview = null;
+        }
         if (_ocrReader is not null)
         {
             await _ocrReader.DisposeAsync().ConfigureAwait(false);
@@ -131,74 +145,224 @@ public partial class MainWindow : Window, IAsyncDisposable
             byte[] bgr = StillImages.CopyToBgr(bgra.Pixels, bgra.Width, bgra.Height);
             Append($"Decoded {bgra.Width}×{bgra.Height} BGR24 ({bgr.Length} bytes).");
 
-            IOcrReader reader = await EnsureOcrReaderAsync(model).ConfigureAwait(true);
-            var stamp = new FrameStamp(
-                new FrameId(Guid.NewGuid(), 1),
-                "still:" + Path.GetFileName(path),
-                bgra.Width, bgra.Height,
-                Stopwatch.GetTimestamp(),
-                null);
-            var layout = new ImageLayout(
-                FrameEncoding.Raw, PixelFormat.Bgr24, bgra.Width, bgra.Height,
-                [new PlaneLayout(0, bgra.Width * 3, bgra.Width * 3, bgra.Height)],
-                ColorRange.Full, ColorMatrix.Unspecified);
-            var input = new ImageInput(stamp, layout, bgr, ImageTransform.Identity);
-            var request = new RecognitionRequest(
-                new AnalysisId(stamp.Id, 1),
-                Stopwatch.GetTimestamp() + Stopwatch.Frequency * 120);
-
-            EngineBatch<OcrLine> batch = await reader.ReadAsync(input, request, CancellationToken.None)
+            await RunOcrOnBgrAsync(bgr, bgra.Width, bgra.Height, model, "still:" + Path.GetFileName(path))
                 .ConfigureAwait(true);
-
-            _lastStamp = stamp;
-            _lastLines = batch.Items;
-            SendOutputButton.IsEnabled = batch.Items.Length > 0;
-
-            if (batch.Status == StageStatus.Faulted)
-            {
-                OcrText.Text = "";
-                Append($"OCR faulted: {batch.Fault?.Code} {batch.Fault?.Message}");
-                SetStatus("OCR faulted.");
-                return;
-            }
-
-            var sb = new StringBuilder();
-            for (int i = 0; i < batch.Items.Length; i++)
-            {
-                OcrLine line = batch.Items[i];
-                string conf = line.Confidence is double c
-                    ? (c * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%"
-                    : "?";
-                sb.AppendLine(line.Text);
-                Append($"  [{i}] conf={conf}  {line.Text}");
-            }
-
-            OcrText.Text = sb.ToString().TrimEnd();
-            SetStatus($"OCR {batch.Status}: {batch.Items.Length} line(s) in {batch.EngineTime.TotalMilliseconds:0} ms.");
-            Append($"Done: {batch.Items.Length} line(s), {batch.EngineTime.TotalMilliseconds:0} ms, status={batch.Status}.");
         }).ConfigureAwait(true);
     }
 
-    private async void OnEnumerateCameras(object? sender, RoutedEventArgs e)
+    private async void OnRefreshCameras(object? sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        await RunExclusiveAsync(() => RefreshCamerasAsync()).ConfigureAwait(true);
+    }
+
+    private async Task RefreshCamerasAsync()
+    {
+        try
+        {
+            SetCameraError("");
+            _cameras = await _cameraProvider.EnumerateAsync(CancellationToken.None).ConfigureAwait(true);
+            CameraDeviceCombo.ItemsSource = _cameras.Select(c => c.DisplayName).ToList();
+            if (_cameras.Length > 0)
+                CameraDeviceCombo.SelectedIndex = 0;
+            else
+            {
+                CameraModeCombo.ItemsSource = null;
+                Append("FlashCap: no MJPEG camera devices (OK if none attached).");
+            }
+
+            Append($"FlashCap: {_cameras.Length} MJPEG device(s).");
+            foreach (var d in _cameras)
+                Append($"  - {d.DisplayName} [{d.Id.ProviderId}/{d.Id.DeviceKey}]");
+            SetStatus($"Cameras: {_cameras.Length}");
+        }
+        catch (Exception ex)
+        {
+            Append($"Enumerate failed: {ex.GetType().Name}: {ex.Message}");
+            SetCameraError($"Enumerate failed: {ex.Message}");
+            SetStatus("Camera enumerate failed.");
+        }
+    }
+
+    private async void OnCameraDeviceChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        int index = CameraDeviceCombo.SelectedIndex;
+        if (index < 0 || index >= _cameras.Length)
+        {
+            CameraModeCombo.ItemsSource = null;
+            return;
+        }
+
+        try
+        {
+            var device = _cameras[index];
+            var modes = await _cameraProvider.GetModesAsync(device.Id, CancellationToken.None).ConfigureAwait(true);
+            CameraModeCombo.ItemsSource = modes.Select(m =>
+                $"{m.Width}×{m.Height} @ {m.FpsNumerator}/{Math.Max(1, m.FpsDenominator)} ({m.ModeId})").ToList();
+            CameraModeCombo.Tag = modes;
+            if (modes.Length > 0)
+                CameraModeCombo.SelectedIndex = 0;
+            Append($"Modes for {device.DisplayName}: {modes.Length}");
+        }
+        catch (Exception ex)
+        {
+            Append($"GetModes failed: {ex.Message}");
+            SetCameraError($"GetModes failed: {ex.Message}");
+        }
+    }
+
+    private async void OnStartPreview(object? sender, RoutedEventArgs e)
     {
         if (_busy) return;
         await RunExclusiveAsync(async () =>
         {
+            if (!TurboJpegNative.TryResolveLibraryPath(out _, out string tjError))
+            {
+                SetCameraError(tjError);
+                Append(tjError);
+                SetStatus("TurboJPEG missing.");
+                return;
+            }
+
+            int di = CameraDeviceCombo.SelectedIndex;
+            int mi = CameraModeCombo.SelectedIndex;
+            if (di < 0 || di >= _cameras.Length)
+            {
+                SetCameraError("Select a camera device first (Refresh devices).");
+                return;
+            }
+
+            if (CameraModeCombo.Tag is not ImmutableArray<CaptureMode> modes || mi < 0 || mi >= modes.Length)
+            {
+                SetCameraError("Select an MJPEG mode.");
+                return;
+            }
+
+            if (_preview is not null)
+            {
+                await _preview.DisposeAsync().ConfigureAwait(true);
+                _preview = null;
+            }
+
+            var device = _cameras[di];
+            var mode = modes[mi];
+            ICameraSession session = await _cameraProvider
+                .OpenAsync(new CameraOpenOptions(device.Id, mode.ModeId), CancellationToken.None)
+                .ConfigureAwait(true);
+
+            _preview = new CameraPreviewController(
+                Append,
+                SetCameraError,
+                bmp => PreviewImage.Source = bmp,
+                () =>
+                {
+                    StartPreviewButton.IsEnabled = true;
+                    StopPreviewButton.IsEnabled = false;
+                    OcrFrameButton.IsEnabled = false;
+                });
+
             try
             {
-                var provider = new FlashCapProvider();
-                var devices = await provider.EnumerateAsync(CancellationToken.None).ConfigureAwait(true);
-                Append($"FlashCap: {devices.Length} MJPEG device(s).");
-                foreach (var d in devices)
-                    Append($"  - {d.DisplayName} [{d.Id.ProviderId}/{d.Id.DeviceKey}]");
-                SetStatus($"Cameras: {devices.Length}");
+                await _preview.StartAsync(session, CancellationToken.None).ConfigureAwait(true);
+                StartPreviewButton.IsEnabled = false;
+                StopPreviewButton.IsEnabled = true;
+                OcrFrameButton.IsEnabled = true;
+                SetStatus("Preview running.");
             }
-            catch (Exception ex)
+            catch
             {
-                Append($"Enumerate failed: {ex.GetType().Name}: {ex.Message}");
-                SetStatus("Camera enumerate failed.");
+                // Session ownership transferred into controller (disposed there on failure).
+                await _preview.DisposeAsync().ConfigureAwait(true);
+                _preview = null;
+                throw;
             }
         }).ConfigureAwait(true);
+    }
+
+    private async void OnStopPreview(object? sender, RoutedEventArgs e)
+    {
+        if (_busy) return;
+        await RunExclusiveAsync(async () =>
+        {
+            if (_preview is null) return;
+            await _preview.StopAsync().ConfigureAwait(true);
+            await _preview.DisposeAsync().ConfigureAwait(true);
+            _preview = null;
+            PreviewImage.Source = null;
+            StartPreviewButton.IsEnabled = true;
+            StopPreviewButton.IsEnabled = false;
+            OcrFrameButton.IsEnabled = false;
+            SetStatus("Preview stopped.");
+            Append("Camera preview stopped.");
+        }).ConfigureAwait(true);
+    }
+
+    private async void OnOcrCurrentFrame(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || _preview is null) return;
+        if (!_preview.TryGetLatestBgra(out byte[] bgra, out int w, out int h, out FrameStamp stamp))
+        {
+            Append("No decoded frame yet — wait for preview.");
+            return;
+        }
+
+        string model = GetSelectedModel();
+        await RunExclusiveAsync(async () =>
+        {
+            SetStatus($"OCR frame ({model})…");
+            byte[] bgr = await Task.Run(() => StillImages.CopyToBgr(bgra, w, h)).ConfigureAwait(true);
+            Append($"OCR current frame {w}×{h} from camera.");
+            await RunOcrOnBgrAsync(bgr, w, h, model, stamp.SourceId).ConfigureAwait(true);
+        }).ConfigureAwait(true);
+    }
+
+    private async Task RunOcrOnBgrAsync(byte[] bgr, int width, int height, string model, string sourceId)
+    {
+        IOcrReader reader = await EnsureOcrReaderAsync(model).ConfigureAwait(true);
+        var stamp = new FrameStamp(
+            new FrameId(Guid.NewGuid(), 1),
+            sourceId,
+            width, height,
+            Stopwatch.GetTimestamp(),
+            null);
+        var layout = new ImageLayout(
+            FrameEncoding.Raw, PixelFormat.Bgr24, width, height,
+            [new PlaneLayout(0, width * 3, width * 3, height)],
+            ColorRange.Full, ColorMatrix.Unspecified);
+        var input = new ImageInput(stamp, layout, bgr, ImageTransform.Identity);
+        var request = new RecognitionRequest(
+            new AnalysisId(stamp.Id, 1),
+            Stopwatch.GetTimestamp() + Stopwatch.Frequency * 120);
+
+        EngineBatch<OcrLine> batch = await reader.ReadAsync(input, request, CancellationToken.None)
+            .ConfigureAwait(true);
+
+        _lastStamp = stamp;
+        _lastLines = batch.Items;
+        SendOutputButton.IsEnabled = batch.Items.Length > 0;
+
+        if (batch.Status == StageStatus.Faulted)
+        {
+            OcrText.Text = "";
+            Append($"OCR faulted: {batch.Fault?.Code} {batch.Fault?.Message}");
+            SetStatus("OCR faulted.");
+            return;
+        }
+
+        var sb = new StringBuilder();
+        for (int i = 0; i < batch.Items.Length; i++)
+        {
+            OcrLine line = batch.Items[i];
+            string conf = line.Confidence is double c
+                ? (c * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%"
+                : "?";
+            sb.AppendLine(line.Text);
+            Append($"  [{i}] conf={conf}  {line.Text}");
+        }
+
+        OcrText.Text = sb.ToString().TrimEnd();
+        SetStatus($"OCR {batch.Status}: {batch.Items.Length} line(s) in {batch.EngineTime.TotalMilliseconds:0} ms.");
+        Append($"Done: {batch.Items.Length} line(s), {batch.EngineTime.TotalMilliseconds:0} ms, status={batch.Status}.");
     }
 
     private void OnApplyOutput(object? sender, RoutedEventArgs e)
@@ -299,7 +463,6 @@ public partial class MainWindow : Window, IAsyncDisposable
                 : $"Admission rejected: {status.LastError ?? "(unknown)"}");
             SetStatus(accepted ? "Queued for output." : "Admission rejected.");
 
-            // brief wait so sender loop can attempt delivery for demo feedback
             await Task.Delay(800).ConfigureAwait(true);
             status = _coordinator.GetStatus();
             Append($"Output status: enabled={status.Enabled} pending={status.PendingCount} delivered={status.DeliveredCount} uncertain={status.UncertainCount} last={status.LastReceiptCode ?? status.LastError ?? "-"}");
@@ -361,9 +524,22 @@ public partial class MainWindow : Window, IAsyncDisposable
         ApplyOutputButton.IsEnabled = enabled;
         SendOutputButton.IsEnabled = enabled && !_lastLines.IsDefaultOrEmpty;
         ModelCombo.IsEnabled = enabled;
+        RefreshCamerasButton.IsEnabled = enabled;
+        CameraDeviceCombo.IsEnabled = enabled && !(_preview?.IsRunning ?? false);
+        CameraModeCombo.IsEnabled = enabled && !(_preview?.IsRunning ?? false);
+        bool previewing = _preview?.IsRunning ?? false;
+        StartPreviewButton.IsEnabled = enabled && !previewing;
+        StopPreviewButton.IsEnabled = enabled && previewing;
+        OcrFrameButton.IsEnabled = enabled && previewing;
     }
 
     private void SetStatus(string text) => StatusText.Text = text;
+
+    private void SetCameraError(string text)
+    {
+        CameraErrorText.Text = text;
+        CameraErrorText.IsVisible = !string.IsNullOrWhiteSpace(text);
+    }
 
     private void Append(string line)
     {

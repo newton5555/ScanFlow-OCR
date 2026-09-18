@@ -18,4 +18,13 @@
     <ProjectReference Include="../ScanFlowOcr.Ocr.SimdPaddle/ScanFlowOcr.Ocr.SimdPaddle.csproj" />
     <ProjectReference Include="../ScanFlowOcr.Outputs/ScanFlowOcr.Outputs.csproj" />
   </ItemGroup>
+  <!-- Official libjpeg-turbo 3.2.0 TurboJPEG shared libs → output native/{rid}/ -->
+  <ItemGroup>
+    <None Include="..\..\native\win-x64\turbojpeg.dll" Link="native\win-x64\turbojpeg.dll" Condition="Exists('..\..\native\win-x64\turbojpeg.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\native\linux-x64\libturbojpeg.so" Link="native\linux-x64\libturbojpeg.so" Condition="Exists('..\..\native\linux-x64\libturbojpeg.so')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

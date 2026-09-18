@@ -2,14 +2,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ScanFlowOcr.App.MainWindow"
         Title="ScanFlow-OCR"
-        Width="1100" Height="740"
-        MinWidth="800" MinHeight="560">
+        Width="1280" Height="800"
+        MinWidth="900" MinHeight="600">
   <DockPanel Margin="12">
     <!-- Toolbar -->
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
       <Button x:Name="OpenImagesButton" Content="Open image(s)…" Click="OnOpenImages"/>
       <Button x:Name="RunOcrButton" Content="Run OCR" Click="OnRunOcr" IsEnabled="False"/>
-      <Button Content="Enumerate cameras" Click="OnEnumerateCameras"/>
       <TextBlock VerticalAlignment="Center" Margin="12,0,0,0" Text="Model:"/>
       <ComboBox x:Name="ModelCombo" Width="110" SelectedIndex="0">
         <ComboBoxItem Content="tiny"/>
@@ -50,12 +49,13 @@
       </StackPanel>
     </Border>
 
-    <!-- Main split: files + OCR text / log -->
-    <Grid ColumnDefinitions="260,*" ColumnSpacing="12">
+    <!-- Main: files | OCR/log | camera -->
+    <Grid ColumnDefinitions="220,*,360" ColumnSpacing="12">
       <DockPanel Grid.Column="0">
         <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Selected images"/>
         <ListBox x:Name="ImageList" SelectionChanged="OnImageSelectionChanged"/>
       </DockPanel>
+
       <Grid Grid.Column="1" RowDefinitions="*,160" RowSpacing="10">
         <DockPanel Grid.Row="0">
           <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,6" Text="Recognized text"/>
@@ -68,6 +68,30 @@
                    FontFamily="Consolas, monospace"/>
         </DockPanel>
       </Grid>
+
+      <Border Grid.Column="2" Padding="10"
+              BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+              BorderThickness="1" CornerRadius="4">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,0,0,8" Text="Camera preview (MJPEG + TurboJPEG)"/>
+          <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+            <Button x:Name="RefreshCamerasButton" Content="Refresh devices" Click="OnRefreshCameras" HorizontalAlignment="Stretch"/>
+            <TextBlock Text="Device"/>
+            <ComboBox x:Name="CameraDeviceCombo" HorizontalAlignment="Stretch" SelectionChanged="OnCameraDeviceChanged"/>
+            <TextBlock Text="MJPEG mode"/>
+            <ComboBox x:Name="CameraModeCombo" HorizontalAlignment="Stretch"/>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button x:Name="StartPreviewButton" Content="Start" Click="OnStartPreview"/>
+              <Button x:Name="StopPreviewButton" Content="Stop" Click="OnStopPreview" IsEnabled="False"/>
+              <Button x:Name="OcrFrameButton" Content="OCR frame" Click="OnOcrCurrentFrame" IsEnabled="False"/>
+            </StackPanel>
+            <TextBlock x:Name="CameraErrorText" TextWrapping="Wrap" Foreground="#C62828" IsVisible="False"/>
+          </StackPanel>
+          <Border Background="#1A1A1A" CornerRadius="2" ClipToBounds="True">
+            <Image x:Name="PreviewImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+        </DockPanel>
+      </Border>
     </Grid>
   </DockPanel>
 </Window>

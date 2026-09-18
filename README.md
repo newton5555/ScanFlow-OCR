@@ -11,7 +11,7 @@ Extracted from the OCR path of private ScanFlow (barcode / DecodeP1 / Phenix / C
 | UI | Avalonia (Win + Linux x64) |
 | Camera | Vendored FlashCap — Windows Media Foundation, Linux V4L2; MJPEG-first |
 | Still images | StbImageSharp + BitMiracle.LibTiff.NET (not TurboJPEG) |
-| Camera JPEG | TurboJPEG via `native/{win-x64\|linux-x64}/` (or `SCANFLOW_OCR_TURBOJPEG_PATH`) |
+| Camera JPEG | TurboJPEG **3.2.0** via `native/{win-x64\|linux-x64}/` (or `SCANFLOW_OCR_TURBOJPEG_PATH`) |
 | OCR | In-process Sdcb.SimdPaddleOCR Chinese V6 Tiny (Small optional) |
 | Keyboard | Windows `SendInput`; Linux self-wrapped `/dev/uinput` (ASCII phase 1) |
 | Outputs | MQTT (MQTTnet), TCP client (optional TLS), keyboard — durable SQLite queue via `OutputCoordinator` |
@@ -31,14 +31,25 @@ dotnet run --project tests/ScanFlowOcr.SmokeTests
 dotnet run --project src/ScanFlowOcr.App
 ```
 
-### Native TurboJPEG
+Build succeeds on Linux **without** a camera attached. Live preview needs `/dev/video*` (Linux) or an MF camera (Windows) plus the TurboJPEG native libs (copied to output on App build).
 
-Place binaries under:
+### Native TurboJPEG (3.2.0 official binaries)
+
+Shipped under:
 
 - `native/win-x64/turbojpeg.dll`
 - `native/linux-x64/libturbojpeg.so`
 
-Still-image decode does not need TurboJPEG.
+Source packages (SHA-256 and extraction notes in `native/ORIGIN.md`):
+
+- Windows VC x64: https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-3.2.0-vc-x64.exe
+- Linux amd64 deb: https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-official_3.2.0_amd64.deb
+
+`ScanFlowOcr.App` copies these into `$(OutputDir)/native/{rid}/` on build. Override with `SCANFLOW_OCR_TURBOJPEG_PATH` if needed.
+
+Still-image decode does **not** need TurboJPEG. Camera MJPEG preview / frame OCR does.
+
+License: IJG + Modified BSD — see `THIRD-PARTY-NOTICES.md`. This software is based in part on the work of the Independent JPEG Group.
 
 ### Linux keyboard
 
@@ -46,7 +57,7 @@ Still-image decode does not need TurboJPEG.
 
 ### Linux camera
 
-FlashCap `CaptureDevices` selects V4L2. Process needs access to `/dev/video*`.
+FlashCap `CaptureDevices` selects V4L2. Process needs access to `/dev/video*`. App UI: refresh devices → pick MJPEG mode → Start preview (TurboJPEG decode) → optional OCR current frame.
 
 ### MQTT / TCP outputs
 
@@ -68,7 +79,7 @@ src/ScanFlowOcr.Ocr.SimdPaddle
 src/ScanFlowOcr.Outputs
 src/ScanFlowOcr.App
 tests/ScanFlowOcr.SmokeTests
-native/win-x64 native/linux-x64
+native/win-x64 native/linux-x64  (+ ORIGIN.md)
 ```
 
 ## Status
@@ -76,13 +87,12 @@ native/win-x64 native/linux-x64
 Phase 1 source migration is in the tree and **builds on Linux** with .NET SDK 10:
 
 - Avalonia packages pinned to **12.1.2**
+- Official **libjpeg-turbo 3.2.0** TurboJPEG libs under `native/`
 - `dotnet build ScanFlowOcr.slnx -c Release` — Contracts, Imaging, Capture.FlashCap (+ vendor), Ocr.SimdPaddle, Outputs, App, SmokeTests
 - `dotnet run --project tests/ScanFlowOcr.SmokeTests` — lease / still-JPEG / keyboard+MQTT+TCP route / coordinator configure / SimdPaddle metadata checks pass
-- Avalonia App phase-1 loop: **Open image(s) → Run OCR (SimdPaddle Tiny/Small) → show text → send via Keyboard / MQTT / TCP** (`OutputCoordinator`)
+- Avalonia App: **Open image(s) → Run OCR**; **camera device/mode → live MJPEG preview (TurboJPEG) → optional OCR frame**; sinks via `OutputCoordinator`
 
 ### Stubbed / deferred
 
-- TurboJPEG native binaries not shipped (`native/{rid}/` placeholders; set `SCANFLOW_OCR_TURBOJPEG_PATH`)
-- Camera: enumerate only (no live preview / capture→OCR pipeline UI yet)
 - Linux keyboard: ASCII (+ Tab/Enter) via `/dev/uinput`; non-ASCII returns `UnicodeUnsupported`
 - No OcrHost, clipboard, or AOT packing

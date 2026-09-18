@@ -1,0 +1,215 @@
+using System;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
+using Avalonia.Threading;
+using ScanFlowOcr.Contracts;
+using ScanFlowOcr.Imaging;
+
+namespace ScanFlowOcr.App;
+
+/// <summary>
+/// FlashCap MJPEG session → TurboJPEG BGRA decode → Avalonia preview bitmap.
+/// Drops frames when the previous decode is still in flight.
+/// </summary>
+internal sealed class CameraPreviewController : IFrameReceiver, IAsyncDisposable
+{
+    private readonly ImageAllocator _allocator = new(64L * 1024 * 1024);
+    private readonly object _latestGate = new();
+    private readonly Action<string> _log;
+    private readonly Action<string> _setError;
+    private readonly Action<WriteableBitmap?> _setPreview;
+    private readonly Action _onStopped;
+
+    private JpegDecoder? _decoder;
+    private ICameraSession? _session;
+    private int _decodeBusy;
+    private int _disposed;
+    private byte[]? _latestBgra;
+    private int _latestWidth;
+    private int _latestHeight;
+    private FrameStamp? _latestStamp;
+    private WriteableBitmap? _bitmap;
+
+    public CameraPreviewController(
+        Action<string> log,
+        Action<string> setError,
+        Action<WriteableBitmap?> setPreview,
+        Action onStopped)
+    {
+        _log = log;
+        _setError = setError;
+        _setPreview = setPreview;
+        _onStopped = onStopped;
+    }
+
+    public bool IsRunning => _session is { State: SourceState.Running or SourceState.Starting };
+
+    public bool TryGetLatestBgra(out byte[] bgra, out int width, out int height, out FrameStamp stamp)
+    {
+        lock (_latestGate)
+        {
+            if (_latestBgra is null || _latestStamp is null || _latestWidth <= 0 || _latestHeight <= 0)
+            {
+                bgra = [];
+                width = height = 0;
+                stamp = default;
+                return false;
+            }
+
+            bgra = (byte[])_latestBgra.Clone();
+            width = _latestWidth;
+            height = _latestHeight;
+            stamp = _latestStamp.Value;
+            return true;
+        }
+    }
+
+    public async Task StartAsync(ICameraSession session, CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
+
+        if (!TurboJpegNative.TryResolveLibraryPath(out string? libraryPath, out string error))
+        {
+            _setError(error);
+            await session.DisposeAsync().ConfigureAwait(false);
+            throw new FileNotFoundException(error);
+        }
+
+        _setError("");
+        _decoder?.Dispose();
+        _decoder = new JpegDecoder(libraryPath);
+        _log($"TurboJPEG loaded: {libraryPath}");
+
+        // Take ownership of the session for the lifetime of this controller.
+        _session = session;
+        try
+        {
+            var epoch = Guid.NewGuid();
+            await session.StartAsync(epoch, this, cancellationToken).ConfigureAwait(false);
+            _log($"Camera started: {session.Device.DisplayName} {session.NegotiatedMode.Width}×{session.NegotiatedMode.Height}");
+        }
+        catch
+        {
+            await StopAsync().ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    public async Task StopAsync()
+    {
+        ICameraSession? session = Interlocked.Exchange(ref _session, null);
+        if (session is null) return;
+        try
+        {
+            await session.StopAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        finally
+        {
+            await session.DisposeAsync().ConfigureAwait(false);
+            _onStopped();
+        }
+    }
+
+    public void OnFrame(in CapturedFrame frame)
+    {
+        if (_disposed != 0 || _decoder is null) return;
+        if (frame.Layout.Encoding != FrameEncoding.Jpeg) return;
+        if (Interlocked.CompareExchange(ref _decodeBusy, 1, 0) != 0) return;
+
+        byte[] jpeg = frame.Buffer.ToArray();
+        var stamp = frame.Stamp;
+        var layout = frame.Layout;
+        JpegDecoder decoder = _decoder;
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                var input = new ImageInput(stamp, layout, jpeg, ImageTransform.Identity);
+                using ImageLease bgraLease = decoder.DecodeBgra(input, _allocator);
+                byte[] bgra = bgraLease.WritableBuffer.ToArray();
+                int w = layout.Width;
+                int h = layout.Height;
+                int stride = w * 4;
+
+                lock (_latestGate)
+                {
+                    _latestBgra = bgra;
+                    _latestWidth = w;
+                    _latestHeight = h;
+                    _latestStamp = stamp;
+                }
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (_disposed != 0) return;
+                    try
+                    {
+                        if (_bitmap is null || _bitmap.PixelSize.Width != w || _bitmap.PixelSize.Height != h)
+                        {
+                            _bitmap?.Dispose();
+                            _bitmap = new WriteableBitmap(
+                                new PixelSize(w, h),
+                                new Vector(96, 96),
+                                PixelFormats.Bgra8888,
+                                AlphaFormat.Opaque);
+                        }
+
+                        using (var fb = _bitmap.Lock())
+                        {
+                            for (int y = 0; y < h; y++)
+                            {
+                                Marshal.Copy(
+                                    bgra,
+                                    y * stride,
+                                    IntPtr.Add(fb.Address, y * fb.RowBytes),
+                                    stride);
+                            }
+                        }
+
+                        _setPreview(_bitmap);
+                    }
+                    catch (Exception ex)
+                    {
+                        _setError($"Preview update failed: {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Dispatcher.UIThread.Post(() => _setError($"TurboJPEG decode failed: {ex.Message}"));
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _decodeBusy, 0);
+            }
+        });
+    }
+
+    public void OnFault(CaptureFault fault)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            _setError($"Camera fault: {fault.Code} — {fault.Message}");
+            _log($"Camera fault: {fault.Code} {fault.Message} (reconnect={fault.CanReconnect})");
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        await StopAsync().ConfigureAwait(false);
+        _decoder?.Dispose();
+        _decoder = null;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _bitmap?.Dispose();
+            _bitmap = null;
+            _setPreview(null);
+        });
+    }
+}

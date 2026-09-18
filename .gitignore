@@ -8,9 +8,9 @@ Directory.Build.local.props
 /.idea/
 *.user
 *.suo
-native/win-x64/*.dll
-native/win-x64/*.so
-native/linux-x64/*.so
-native/linux-x64/*.dll
-!native/win-x64/.gitkeep
-!native/linux-x64/.gitkeep
+
+# Never commit full official installers — only extracted shared libs under native/
+native/**/*.exe
+native/**/*.deb
+native/**/*.msi
+native/**/*.rpm
