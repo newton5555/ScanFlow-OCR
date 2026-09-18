@@ -5,5 +5,10 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="MQTTnet" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
 </Project>

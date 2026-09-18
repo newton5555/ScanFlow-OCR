@@ -38,6 +38,30 @@ Check(KeyboardRoute.UnescapeSeparator("\\t") == "\t", "unescape tab");
 Check(SimdPaddleOcrMetadata.Parameters.Length > 0, "simd paddle parameters");
 Check(SimdPaddleOcrMetadata.ProviderId == "SimdPaddle", "provider id");
 
+
+Check(MqttRoute.Default.Validate() is null, "mqtt default route ok");
+Check(new MqttRoute("bad host", 1883, false, "id", "t", 1, null, null).Validate() is not null, "mqtt rejects whitespace broker");
+Check(new MqttRoute("localhost", 1883, false, "id", "a/+/b", 1, null, null).Validate() is not null, "mqtt rejects wildcard topic");
+Check(new TcpRoute("127.0.0.1", 9100, false).Validate() is null, "tcp route ok");
+Check(new TcpRoute("host", 0, false).Validate() is not null, "tcp rejects bad port");
+
+{
+    string dir = Path.Combine(Path.GetTempPath(), "scanflow-ocr-smoke-" + Guid.NewGuid().ToString("N"));
+    await using var coordinator = new OutputCoordinator(dir);
+    coordinator.Configure(true, MqttRoute.Default, 100);
+    var status = coordinator.GetStatus();
+    Check(status.Enabled, "coordinator mqtt enabled");
+    Check(status.Routes.Length == 1 && status.Routes[0].SinkId == "mqtt", "coordinator mqtt route");
+    coordinator.Configure([]);
+    Check(!coordinator.GetStatus().Enabled, "coordinator disabled");
+
+    var tcp = new TcpRoute("127.0.0.1", 9, false);
+    coordinator.Configure([new OutputRouteProfile("tcp", true, 10, 1024 * 1024,
+        System.Text.Json.JsonSerializer.SerializeToElement(tcp))]);
+    Check(coordinator.GetStatus().Routes[0].SinkId == "tcp", "coordinator tcp route");
+    coordinator.Configure([]);
+}
+
 var sink = KeyboardOutputSink.Create(new KeyboardRoute("scanflow-smoke-target"));
 Check(sink.Descriptor.Id == "keyboard", "keyboard sink id");
 await sink.DisposeAsync();

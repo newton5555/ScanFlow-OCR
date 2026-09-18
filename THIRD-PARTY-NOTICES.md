@@ -32,7 +32,18 @@ Not redistributed in this repository by default (placeholders only).
 
 Avalonia UI (MIT). See NuGet package licenses.
 
-## Microsoft.Data.Sqlite / SQLitePCLRaw (optional future)
+## MQTTnet
 
-Not referenced in phase 1 keyboard-only Outputs; listed for planned durable queue work.
-When added, include SQLite blessing / PCLRaw notices.
+MQTTnet (MIT) — MQTT client used by `MqttOutputSink`. See NuGet package license.
+
+## Microsoft.Data.Sqlite / SQLitePCLRaw
+
+SQLite durable output queue in `OutputCoordinator`. Include SQLite blessing / PCLRaw notices when shipping binaries.
+
+## Serilog / Serilog.Sinks.File
+
+Apache-2.0 / MIT — file logging used by `OutputCoordinator`. See NuGet package licenses.
+
+## System.Security.Cryptography.ProtectedData
+
+MIT — Windows DPAPI helper for MQTT password protection (optional on non-Windows).

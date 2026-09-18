@@ -14,11 +14,12 @@ Extracted from the OCR path of private ScanFlow (barcode / DecodeP1 / Phenix / C
 | Camera JPEG | TurboJPEG via `native/{win-x64\|linux-x64}/` (or `SCANFLOW_OCR_TURBOJPEG_PATH`) |
 | OCR | In-process Sdcb.SimdPaddleOCR Chinese V6 Tiny (Small optional) |
 | Keyboard | Windows `SendInput`; Linux self-wrapped `/dev/uinput` (ASCII phase 1) |
+| Outputs | MQTT (MQTTnet), TCP client (optional TLS), keyboard — durable SQLite queue via `OutputCoordinator` |
 | License | Apache-2.0 |
 
 ## Deferred
 
-Separate OcrHost process, MQTT/TCP sinks, clipboard auto-output, AOT packing.
+Separate OcrHost process, clipboard auto-output, AOT packing.
 
 ## Build
 
@@ -47,6 +48,16 @@ Still-image decode does not need TurboJPEG.
 
 FlashCap `CaptureDevices` selects V4L2. Process needs access to `/dev/video*`.
 
+### MQTT / TCP outputs
+
+`ScanFlowOcr.Outputs` provides:
+
+- `MqttRoute` / `MqttOutputSink` — broker, port, TLS, client id, topic, QoS 0–2, optional username/password
+- `TcpRoute` / `TcpOutputSink` — host, port, optional TLS; one UTF-8 JSON line per record (LF-terminated)
+- `OutputCoordinator` — single-sink durable queue (SQLite under `%LOCALAPPDATA%/ScanFlowOcr` or `~/.local/share/ScanFlowOcr`)
+
+Payloads are OCR-only JSON (`textLines`); no barcode fields. MQTT passwords use Windows DPAPI when available; on Linux the protected field stores plaintext.
+
 ## Layout
 
 ```
@@ -64,12 +75,13 @@ native/win-x64 native/linux-x64
 
 Phase 1 source migration is in the tree and **builds on Linux** with .NET SDK 10:
 
-- `dotnet build ScanFlowOcr.slnx` — Contracts, Imaging, Capture.FlashCap (+ vendor), Ocr.SimdPaddle, Outputs, App, SmokeTests
-- `dotnet run --project tests/ScanFlowOcr.SmokeTests` — lease / still-JPEG / keyboard route / SimdPaddle metadata checks pass
+- `dotnet build ScanFlowOcr.slnx` — Contracts, Imaging, Capture.FlashCap (+ vendor), Ocr.SimdPaddle, Outputs (keyboard + MQTT + TCP + coordinator), App, SmokeTests
+- `dotnet run --project tests/ScanFlowOcr.SmokeTests` — lease / still-JPEG / keyboard+MQTT+TCP route / coordinator configure / SimdPaddle metadata checks pass
 
 ### Stubbed / deferred
 
 - TurboJPEG native binaries not shipped (`native/{rid}/` placeholders; set `SCANFLOW_OCR_TURBOJPEG_PATH`)
 - Avalonia UI: camera enumerate + OCR/keyboard hooks only; no live preview/OCR pipeline UI yet
 - Linux keyboard: ASCII (+ Tab/Enter) via `/dev/uinput`; non-ASCII returns `UnicodeUnsupported`
-- No OcrHost, MQTT/TCP, clipboard, or AOT packing
+- No OcrHost, clipboard, or AOT packing
+- App settings UI not yet wired to MQTT/TCP coordinator (library sinks + queue are ready)
