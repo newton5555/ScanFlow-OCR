@@ -138,6 +138,7 @@ public partial class SettingsWindow : Window
         TcpPortBox.Text = _draft.TcpPort.ToString(CultureInfo.InvariantCulture);
         TcpTlsBox.IsChecked = _draft.TcpTls;
         QueueCapacityBox.Text = _draft.OutputQueueCapacity.ToString(CultureInfo.InvariantCulture);
+        UpdateConditionalSections();
     }
 
     private async void OnSettingsCameraDeviceChanged(object? sender, SelectionChangedEventArgs e)
@@ -191,6 +192,26 @@ public partial class SettingsWindow : Window
     }
 
     private void OnCancel(object? sender, RoutedEventArgs e) => Close(null);
+
+    private void OnOutputRouteChanged(object? sender, RoutedEventArgs e) => UpdateConditionalSections();
+
+    private void OnRoiEnabledChanged(object? sender, RoutedEventArgs e) => UpdateConditionalSections();
+
+    private void OnDedupeStrategyChanged(object? sender, RoutedEventArgs e) => UpdateConditionalSections();
+
+    private void UpdateConditionalSections()
+    {
+        if (OutputKeyboardSection is not null)
+            OutputKeyboardSection.IsVisible = RbOutKeyboard.IsChecked == true;
+        if (OutputMqttSection is not null)
+            OutputMqttSection.IsVisible = RbOutMqtt.IsChecked == true;
+        if (OutputTcpSection is not null)
+            OutputTcpSection.IsVisible = RbOutTcp.IsChecked == true;
+        if (RoiFieldsPanel is not null)
+            RoiFieldsPanel.IsEnabled = ChkEnableRoi.IsChecked == true;
+        if (DedupeIntervalRow is not null)
+            DedupeIntervalRow.IsVisible = RbDedupeCooldown.IsChecked == true;
+    }
 
     private async void OnSave(object? sender, RoutedEventArgs e)
     {

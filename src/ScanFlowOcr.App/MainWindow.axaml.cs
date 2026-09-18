@@ -498,6 +498,17 @@ public partial class MainWindow : Window, IAsyncDisposable
         await OpenSettingsDialogAsync(false).ConfigureAwait(true);
     }
 
+    private void OnQuickOcr(object? sender, RoutedEventArgs e)
+    {
+        if (_playlist.Count > 0 && _preview is null && _activeSession is null)
+        {
+            OnRunOcr(sender, e);
+            return;
+        }
+
+        OnOcrCurrentFrame(sender, e);
+    }
+
     private void OnToggleTheme(object? sender, RoutedEventArgs e)
     {
         var app = Application.Current;
@@ -625,9 +636,12 @@ public partial class MainWindow : Window, IAsyncDisposable
         _lastLines = [];
         _lastStamp = null;
         SendOutputButton.IsEnabled = false;
+        ClearResultsButton.IsEnabled = false;
+        ResultsList.SelectedItem = null;
         SyncFrameAnnotations();
         TxtInspectorText.Text = "选择一条结果查看详情";
         TxtInspectorMeta.Text = "";
+        SelectedResultCopyButton.IsEnabled = false;
         Log.Text = "";
         _logLinesCount = 0;
         TxtLogLineCount.Text = "0 行";
@@ -920,7 +934,9 @@ public partial class MainWindow : Window, IAsyncDisposable
             }
 
             Append($"输入源: {_cameras.Length} 个（相机 / 图片）。");
+            SetPipelineStatus(_cameras.Length == 0 ? "无输入源" : "待扫描", active: false);
             SetStatus(_cameras.Length == 0 ? "未找到输入源" : $"已就绪 · {_cameras.Length} 个输入源");
+            UpdateToolbarActions();
         }
         catch (Exception ex)
         {
@@ -933,7 +949,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         if (_suppressDeviceSelectionChanged) return;
         int index = CameraDeviceCombo.SelectedIndex;
-        if (index < 0 || index >= _cameras.Length) { CameraModeCombo.ItemsSource = null; return; }
+        if (index < 0 || index >= _cameras.Length)
+        {
+            CameraModeCombo.ItemsSource = null;
+            UpdateToolbarActions();
+            return;
+        }
         await SelectDeviceAndModeAsync(_cameras[index], null, index, _settings.PreferredModeIndex).ConfigureAwait(true);
     }
 
@@ -941,6 +962,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         if (_suppressDeviceSelectionChanged) return;
         UpdateCurrentSourceCard();
+        UpdateToolbarActions();
     }
 
     private async Task SelectDeviceAndModeAsync(
@@ -1063,6 +1085,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 _suppressDeviceSelectionChanged = false;
             }
 
+            SetPipelineStatus("待扫描", active: false);
             SetStatus($"已就绪 · {device.DisplayName} ({modes.Length} 种可用模式)");
         }
         catch (Exception ex)
@@ -1073,6 +1096,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         finally
         {
             UpdateCurrentSourceCard();
+            UpdateToolbarActions();
         }
     }
 
@@ -1352,6 +1376,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 SourceId = record.Frame.SourceId
             });
         }
+        ClearResultsButton.IsEnabled = _allResults.Count > 0;
         while (_allResults.Count > 500)
             _allResults.RemoveAt(_allResults.Count - 1);
         ApplyResultFilter();
@@ -1380,8 +1405,10 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             TxtInspectorText.Text = "选择一条结果查看详情";
             TxtInspectorMeta.Text = "";
+            SelectedResultCopyButton.IsEnabled = false;
             return;
         }
+        SelectedResultCopyButton.IsEnabled = !string.IsNullOrWhiteSpace(item.Text);
         TxtInspectorText.Text = item.Text;
         TxtInspectorMeta.Text = $"{item.Time}  {item.ConfidenceDisplay}\n{item.BoundsSummary}\nEventId={item.EventId:N}\nSource={item.SourceId}";
     }
@@ -1579,7 +1606,9 @@ public partial class MainWindow : Window, IAsyncDisposable
                 OcrFrameButton.IsEnabled = true;
                 StartScanButton.IsEnabled = false;
                 SetPreviewChrome(true, scanning: false);
+                SetPipelineStatus("预览中", active: true);
                 SetStatus("实时预览中");
+                UpdateToolbarActions();
             }
             catch
             {
@@ -1606,7 +1635,9 @@ public partial class MainWindow : Window, IAsyncDisposable
             OcrFrameButton.IsEnabled = false;
             StartScanButton.IsEnabled = true;
             SetPreviewChrome(false, scanning: false);
+            SetPipelineStatus("待扫描", active: false);
             SetStatus("预览已停止");
+            UpdateToolbarActions();
         }).ConfigureAwait(true);
     }
 
@@ -1698,7 +1729,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         var record = new ScanRecord(Guid.NewGuid(), new AnalysisId(stamp.Id, 1), stamp, DateTimeOffset.UtcNow,
             items, ImmutableDictionary<string, string>.Empty);
         AddRecord(record);
-        SetPipelineStatus("取景就绪", active: false);
+        SetPipelineStatus(_preview is not null ? "预览中" : "待扫描", active: _preview is not null);
         SetStatus($"OCR {batch.Status} · {items.Length} 行 · {batch.EngineTime.TotalMilliseconds:0} ms");
     }
 
@@ -1809,6 +1840,35 @@ public partial class MainWindow : Window, IAsyncDisposable
         RefreshCamerasButton.IsEnabled = enabled && !scanning && !previewing && !roiEditing;
         BtnEditRoi.IsEnabled = enabled && !_roiBusy && !_isEditingRoi && !scanning && _sourceWidth > 0 && _sourceHeight > 0;
         SendOutputButton.IsEnabled = enabled && !_lastLines.IsDefaultOrEmpty;
+        UpdateToolbarActions();
+    }
+
+    private void UpdateToolbarActions()
+    {
+        if (QuickOcrButton is null) return;
+
+        bool scanning = _activeSession is not null;
+        bool previewing = _preview?.IsRunning == true;
+        bool hasSelection = HasValidCaptureSelection();
+        bool imageSource = hasSelection &&
+                           ImagePlaylistCameraProvider.IsImageDevice(_cameras[CameraDeviceCombo.SelectedIndex].Id);
+        bool canStartScan = hasSelection && (!imageSource || _playlist.Count > 0);
+
+        bool canStillOcr = imageSource && _playlist.Count > 0 && !scanning && !previewing;
+        bool canFrameOcr = previewing && !scanning;
+        QuickOcrButton.IsVisible = canStillOcr || canFrameOcr;
+        QuickOcrButton.IsEnabled = !_busy;
+        QuickOcrText.Text = canFrameOcr ? "识别当前帧" : "识别当前图片";
+        StartScanButton.IsEnabled = !_busy && !scanning && !previewing && !_isEditingRoi && canStartScan;
+    }
+
+    private bool HasValidCaptureSelection()
+    {
+        int deviceIndex = CameraDeviceCombo.SelectedIndex;
+        int modeIndex = CameraModeCombo.SelectedIndex;
+        return deviceIndex >= 0 && deviceIndex < _cameras.Length &&
+               CameraModeCombo.Tag is ImmutableArray<CaptureMode> modes &&
+               modeIndex >= 0 && modeIndex < modes.Length;
     }
 
     private void SetStatus(string text)

@@ -16,7 +16,7 @@
 
   <Color x:Key="TextPrimaryColor">#e6edf3</Color>
   <Color x:Key="TextSecondaryColor">#9aa2ae</Color>
-  <Color x:Key="TextMutedColor">#656d79</Color>
+  <Color x:Key="TextMutedColor">#818b98</Color>
   <Color x:Key="TextInverseColor">#111315</Color>
 
   <Color x:Key="BrandColor">#3b719f</Color>

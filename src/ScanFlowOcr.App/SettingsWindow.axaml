@@ -97,7 +97,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                       <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                               BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                        <Path Data="{StaticResource GeoSliders}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Path Data="{StaticResource GeoSliders}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.4" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                       </Border>
                       <TextBlock Text="会话取景与画面预览" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
@@ -177,7 +177,7 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoSliders}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoSliders}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.4" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Text="识别性能与过滤阈值" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                   </StackPanel>
@@ -214,11 +214,12 @@
                       </Border>
                       <TextBlock Text="ROI 区域裁剪" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                     </StackPanel>
-                    <ToggleSwitch Grid.Column="1" x:Name="ChkEnableRoi" ToolTip.Tip="启用或停用 ROI 区域裁剪" />
+                    <ToggleSwitch Grid.Column="1" x:Name="ChkEnableRoi" ToolTip.Tip="启用或停用 ROI 区域裁剪"
+                                  IsCheckedChanged="OnRoiEnabledChanged" />
                   </Grid>
                   <TextBlock Text="限制 OCR 识别算法在画面的特定区域运行，大幅减少算力消耗并提高识别速度" Classes="muted" />
 
-                  <Grid ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*,Auto" ColumnSpacing="8" RowSpacing="6" Margin="0,4,0,0">
+                  <Grid x:Name="RoiFieldsPanel" ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*,Auto" ColumnSpacing="8" RowSpacing="6" Margin="0,4,0,0">
                     <TextBlock VerticalAlignment="Center" Classes="muted" Text="X%" />
                     <TextBox x:Name="RoiXBox" Grid.Column="1" Text="10" Height="30" />
                     <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="Y%" />
@@ -255,12 +256,12 @@
                   </StackPanel>
                   <TextBlock Text="控制连续扫描中相同文本结果的过滤机制，避免重复录入" Classes="muted" />
                   <StackPanel Spacing="8" Margin="0,4,0,4">
-                    <RadioButton x:Name="RbDedupeSession" Content="会话去重 (Session) — 扫描会话内同一文本仅接纳并输出一次" GroupName="Dedupe" IsChecked="True" />
-                    <RadioButton x:Name="RbDedupeCooldown" Content="冷却去重 (Cooldown) — 指定时间内不再输出相同文本" GroupName="Dedupe" />
-                    <RadioButton x:Name="RbDedupeUntilAbsent" Content="离场去重 (UntilAbsent) — 目标文本离开视野后再进入才重新接纳" GroupName="Dedupe" />
-                    <RadioButton x:Name="RbDedupeIntraFrame" Content="帧内去重 (IntraFrame) — 仅过滤同一帧内的重复条目" GroupName="Dedupe" />
+                    <RadioButton x:Name="RbDedupeSession" Content="会话去重 (Session) — 扫描会话内同一文本仅接纳并输出一次" GroupName="Dedupe" IsChecked="True" IsCheckedChanged="OnDedupeStrategyChanged" />
+                    <RadioButton x:Name="RbDedupeCooldown" Content="冷却去重 (Cooldown) — 指定时间内不再输出相同文本" GroupName="Dedupe" IsCheckedChanged="OnDedupeStrategyChanged" />
+                    <RadioButton x:Name="RbDedupeUntilAbsent" Content="离场去重 (UntilAbsent) — 目标文本离开视野后再进入才重新接纳" GroupName="Dedupe" IsCheckedChanged="OnDedupeStrategyChanged" />
+                    <RadioButton x:Name="RbDedupeIntraFrame" Content="帧内去重 (IntraFrame) — 仅过滤同一帧内的重复条目" GroupName="Dedupe" IsCheckedChanged="OnDedupeStrategyChanged" />
                   </StackPanel>
-                  <Grid ColumnDefinitions="140,*,140,*" RowDefinitions="Auto" ColumnSpacing="12" Margin="0,4,0,0">
+                  <Grid x:Name="DedupeIntervalRow" ColumnDefinitions="140,*,140,*" RowDefinitions="Auto" ColumnSpacing="12" Margin="0,4,0,0">
                     <TextBlock VerticalAlignment="Center" Classes="muted" Text="冷却间隔 (ms)" />
                     <TextBox x:Name="DedupeIntervalBox" Grid.Column="1" Width="140" Text="1500" Height="30" />
                   </Grid>
@@ -288,21 +289,21 @@
                   </StackPanel>
                   <TextBlock Text="选择识别结果的发送目标，支持自动写入 SQLite 持久化队列保证不丢数据" Classes="muted" />
                   <StackPanel Orientation="Horizontal" Spacing="18" Margin="0,4,0,0">
-                    <RadioButton x:Name="RbOutNone" Content="关闭输出" GroupName="Out" IsChecked="True" />
-                    <RadioButton x:Name="RbOutKeyboard" Content="键盘模拟 (Windows SendInput / Linux uinput)" GroupName="Out" />
-                    <RadioButton x:Name="RbOutMqtt" Content="MQTT 客户端" GroupName="Out" />
-                    <RadioButton x:Name="RbOutTcp" Content="TCP 客户端" GroupName="Out" />
+                    <RadioButton x:Name="RbOutNone" Content="关闭输出" GroupName="Out" IsChecked="True" IsCheckedChanged="OnOutputRouteChanged" />
+                    <RadioButton x:Name="RbOutKeyboard" Content="键盘模拟" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
+                    <RadioButton x:Name="RbOutMqtt" Content="MQTT 客户端" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
+                    <RadioButton x:Name="RbOutTcp" Content="TCP 客户端" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
                   </StackPanel>
                 </StackPanel>
               </Border>
 
               <!-- 键盘模拟参数 -->
-              <Border Classes="settings-group">
+              <Border x:Name="OutputKeyboardSection" Classes="settings-group">
                 <StackPanel Spacing="10">
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoTerminal}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoTerminal}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Text="键盘模拟配置" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                   </StackPanel>
@@ -337,7 +338,7 @@
               </Border>
 
               <!-- MQTT 配置 -->
-              <Border Classes="settings-group">
+              <Border x:Name="OutputMqttSection" Classes="settings-group">
                 <StackPanel Spacing="10">
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
@@ -384,12 +385,12 @@
               </Border>
 
               <!-- TCP 配置 -->
-              <Border Classes="settings-group">
+              <Border x:Name="OutputTcpSection" Classes="settings-group">
                 <StackPanel Spacing="10">
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoPulseLive}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoPulseLive}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Text="TCP 客户端配置" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
                   </StackPanel>
