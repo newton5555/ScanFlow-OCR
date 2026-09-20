@@ -6,10 +6,12 @@
     <File Path="global.json" />
     <File Path="LICENSE" />
     <File Path="README.md" />
+    <File Path="CHANGELOG.md" />
     <File Path="THIRD-PARTY-NOTICES.md" />
   </Folder>
   <Folder Name="/docs/">
     <File Path="docs/MEMORY-OPTIMIZATION.md" />
+    <File Path="docs/RELEASE-1.0.0.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />

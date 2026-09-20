@@ -30,5 +30,3 @@
 构建和 smoke 覆盖：缓冲引用计数、size-class 复用、TrimExcess、ROI 共享像素、JPEG 缩放、JPEG/BGRA OCR 格式转换。
 
 尚待真实相机长跑与 Private Bytes / 工作集对照；本文件不虚构节省 MB 数值。
-
-Out of scope: DecodeP1 / Phenix / CoreHost / MemoryModule / 条码 UI。

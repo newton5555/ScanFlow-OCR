@@ -93,3 +93,11 @@ bash ./run.sh
 bash ./setup-permissions.sh
 ./ScanFlowOcr.App
 ```
+---
+
+## 4. Linux 运行与键盘输出提示
+
+- 推荐用发布目录内 `bash ./run.sh` 启动（会配置 `LD_LIBRARY_PATH`）。
+- 键盘输出依赖 `/dev/uinput`；用户宜加入 `input` 组。
+- **Linux 不按进程名切焦点**，键入当前焦点窗口；测 gedit 时请先点进文档。
+- 应用日志默认：`~/.local/share/ScanFlowOcr/logs/`。

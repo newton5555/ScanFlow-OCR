@@ -19,8 +19,19 @@ TurboJPEG 来源与校验：`native/ORIGIN.md`。可选环境变量：`SCANFLOW_
 
 ### 平台注意
 
-- **Windows**：相机需能提供 MJPEG（或可回退后端）；键盘输出使用 `SendInput`。
-- **Linux**：预览需 `/dev/video*`；键盘输出需 `/dev/uinput` 写权限（Phase 1 仅 ASCII + Tab/Enter）。
+- **Windows**：相机需能提供 MJPEG（或可回退后端）；键盘输出使用 `SendInput`，可按进程名匹配前台窗口（如 `notepad.exe`）。
+- **Linux**：预览需 `/dev/video*`；键盘输出写 `/dev/uinput`（建议用户加入 `input` 组）。当前实现**只向当前焦点窗口灌键**，不按进程名切换焦点；使用前请先点开目标编辑器（如 gedit）并保持光标在文档内。Phase 1 键盘仅 ASCII + Tab/Enter。
+
+### 数据与日志目录
+
+均在 `LocalApplicationData/ScanFlowOcr/` 下：
+
+| 平台 | 路径 |
+|------|------|
+| **Linux** | `~/.local/share/ScanFlowOcr/` |
+| **Windows** | `%LOCALAPPDATA%\ScanFlowOcr\` |
+
+其中：`logs/scanflow-ocr-*.log`（按天滚动）、`outputs.db`、回退配置 `appsettings.json`（主配置仍优先程序目录下的 `appsettings.json`）。
 
 ## 构建与运行
 
@@ -36,7 +47,7 @@ dotnet run --project src/ScanFlowOcr.App
 dotnet run --project tests/ScanFlowOcr.SmokeTests -- --camera
 ```
 
-发布打包（产物默认位于 `publish/win-x64`、`publish/linux-x64`）：
+发布脚本见 `scripts/`（产物默认 `publish/win-x64`、`publish/linux-x64`）：
 
 ```bash
 # Windows x64 自包含发布 (PowerShell 7)
@@ -45,6 +56,8 @@ pwsh scripts/Publish-Win-x64.ps1 -SelfContained
 # Linux x64 自包含发布 (Bash)
 bash scripts/publish-linux-x64.sh
 ```
+
+发布说明与变更记录：`docs/RELEASE-1.0.0.md`、`CHANGELOG.md`。
 
 ## 仓库结构
 
