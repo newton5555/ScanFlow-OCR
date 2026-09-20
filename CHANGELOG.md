@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **TCP 输出移除 TLS 选项**：TCP 通道定位为产线内网裸套接字推送，加密开关属伪需求。`TcpRoute` 不再包含 `Tls` 参数，设置界面移除「安全连接 (TLS)」行；MQTT 的 TLS 不受影响。
+- **阅读方向箭头固定为红色**：新增 `ReadingAxisArrowBrush` 主题令牌（深色 `#ff4d4f` / 浅色 `#d92d20`），箭头不再复用品牌色，避免与逐框配色混淆。
+
+### Added
+- **OCR 框逐框配色**：同一帧内每个 OCR 框按索引取不同强调色（`AnnotationPalette`，8 色循环，不含红色），浮动气泡与右侧结果列表行使用同一颜色，便于对照定位；结果行新增左侧色条与同色「OCR」标签。
+
 ## [1.0.1] - 2026-09-20
 
 ### Fixed

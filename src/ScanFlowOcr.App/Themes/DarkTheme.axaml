@@ -91,6 +91,9 @@
   <SolidColorBrush x:Key="SymbologyBadgeOcrBorderBrush" Color="#1f385c" />
   <SolidColorBrush x:Key="SymbologyBadgeOcrTextBrush" Color="#60a5fa" />
 
+  <!-- Reading-axis arrow: always red so it never collides with per-box accents -->
+  <SolidColorBrush x:Key="ReadingAxisArrowBrush" Color="#ff4d4f" />
+
   <!-- Green ToggleSwitch Brushes (Matching Reference) -->
   <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#16a34a" />
   <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#22c55e" />

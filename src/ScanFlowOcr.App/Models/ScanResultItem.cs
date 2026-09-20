@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using System.Globalization;
 using ScanFlowOcr.Contracts;
 
@@ -13,6 +14,12 @@ public sealed class ScanResultItem
     public Quad Bounds { get; init; }
     public double ReadingAngleDegrees { get; init; }
     public string SourceId { get; init; } = "";
+
+    /// <summary>Accent color shared with this line's box on the preview overlay.</summary>
+    public IBrush AccentBrush { get; init; } = Brushes.Transparent;
+
+    /// <summary>Translucent variant of <see cref="AccentBrush"/> for chips and row bars.</summary>
+    public IBrush AccentTintBrush { get; init; } = Brushes.Transparent;
 
     public string ConfidenceDisplay =>
         Confidence is "-" or "" ? "" : $"得分: {Confidence}";

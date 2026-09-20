@@ -483,11 +483,11 @@
           <!-- Results Table + Inspector -->
           <Grid Grid.Row="2" RowDefinitions="Auto,*,Auto">
             <Border Grid.Row="0" Classes="results-table-header">
-              <Grid ColumnDefinitions="36,*,64,24" ColumnSpacing="8" Margin="0,0,14,0">
-                <TextBlock Text="类型" Classes="muted" FontSize="10" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="1" Text="识别文本" Classes="muted" FontSize="10" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="2" Text="置信度" Classes="muted" FontSize="10" FontWeight="SemiBold" />
-                <TextBlock Grid.Column="3" Text="操作" Classes="muted" FontSize="10" FontWeight="SemiBold"
+              <Grid ColumnDefinitions="3,36,*,64,24" ColumnSpacing="8" Margin="0,0,14,0">
+                <TextBlock Grid.Column="1" Text="类型" Classes="muted" FontSize="10" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="识别文本" Classes="muted" FontSize="10" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="3" Text="置信度" Classes="muted" FontSize="10" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="4" Text="操作" Classes="muted" FontSize="10" FontWeight="SemiBold"
                            HorizontalAlignment="Right" />
               </Grid>
             </Border>
@@ -501,24 +501,26 @@
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="models:ScanResultItem">
                       <Border Classes="result-row" Padding="8,8">
-                        <Grid ColumnDefinitions="36,*,64,24" ColumnSpacing="8">
-                          <Border Classes="result-kind-chip" Background="{DynamicResource SymbologyBadgeOcrBgBrush}"
-                                  BorderBrush="{DynamicResource SymbologyBadgeOcrBorderBrush}">
+                        <Grid ColumnDefinitions="3,36,*,64,24" ColumnSpacing="8">
+                          <Border Grid.Column="0" Width="3" CornerRadius="2"
+                                  Background="{Binding AccentBrush}" />
+                          <Border Grid.Column="1" Classes="result-kind-chip" Background="{Binding AccentTintBrush}"
+                                  BorderBrush="{Binding AccentBrush}">
                             <TextBlock Text="OCR" FontSize="10" FontWeight="Bold"
-                                       Foreground="{DynamicResource SymbologyBadgeOcrTextBrush}" />
+                                       Foreground="{Binding AccentBrush}" />
                           </Border>
-                          <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                          <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
                             <TextBlock Text="{Binding Text}" FontSize="12" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding Time}" Classes="muted" FontSize="10" />
                           </StackPanel>
-                          <Border Grid.Column="2" Classes="result-confidence">
+                          <Border Grid.Column="3" Classes="result-confidence">
                             <TextBlock Text="{Binding Confidence}" FontSize="10" FontWeight="SemiBold"
                                        FontFamily="Cascadia Code, Consolas, monospace"
                                        Foreground="{DynamicResource TextSecondaryBrush}" />
                           </Border>
-                          <Button Grid.Column="3" Classes="ghost" Width="24" Height="24" Padding="0"
+                          <Button Grid.Column="4" Classes="ghost" Width="24" Height="24" Padding="0"
                                   ToolTip.Tip="复制此条文本" Tag="{Binding}" Click="OnCopyResultItem">
                             <Path Data="{StaticResource GeoCopy}" Classes="icon-stroke-muted" Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
                           </Button>

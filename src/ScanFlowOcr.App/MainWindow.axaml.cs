@@ -1431,8 +1431,9 @@ public partial class MainWindow : Window, IAsyncDisposable
         _lastStamp = record.Frame;
         SendOutputButton.IsEnabled = !record.TextLines.IsDefaultOrEmpty;
         string time = DateTimeOffset.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-        foreach (var line in record.TextLines)
+        for (int index = 0; index < record.TextLines.Length; index++)
         {
+            var line = record.TextLines[index];
             string conf = line.Confidence is double c
                 ? (c * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%"
                 : "-";
@@ -1445,7 +1446,9 @@ public partial class MainWindow : Window, IAsyncDisposable
                 EventId = record.EventId,
                 Bounds = line.Bounds,
                 ReadingAngleDegrees = line.ReadingAngleDegrees,
-                SourceId = record.Frame.SourceId
+                SourceId = record.Frame.SourceId,
+                AccentBrush = AnnotationPalette.Stroke(index),
+                AccentTintBrush = AnnotationPalette.Tint(index)
             });
         }
         ClearResultsButton.IsEnabled = _allResults.Count > 0;
@@ -2308,8 +2311,11 @@ public partial class MainWindow : Window, IAsyncDisposable
         // OCR boxes: highlight fill when toast hover sets _hoveredAnnotation (boxes are not hit-test targets).
         if (!_frameLines.IsDefaultOrEmpty)
         {
-            foreach (var item in _frameLines)
+            // Distinct accent per box index so the same line reads the same color in
+            // the box, its toast card and the right-hand result row.
+            for (int index = 0; index < _frameLines.Length; index++)
             {
+                var item = _frameLines[index];
                 bool isHovered = ReferenceEquals(_hoveredAnnotation, item) ||
                                  (_hoveredAnnotation is OcrLine o &&
                                   o.Text == item.Text &&
@@ -2328,16 +2334,8 @@ public partial class MainWindow : Window, IAsyncDisposable
                     ]
                 };
 
-                if (isHovered)
-                {
-                    poly.Fill = ResolveBrush("SymbologyBadgeOcrTintBrush", new SolidColorBrush(Color.FromArgb(50, 0, 122, 255)));
-                    poly.Stroke = ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.DodgerBlue);
-                }
-                else
-                {
-                    poly.Fill = Brushes.Transparent;
-                    poly.Stroke = ResolveBrush("BrandBrush", Brushes.DodgerBlue);
-                }
+                poly.Stroke = AnnotationPalette.Stroke(index);
+                poly.Fill = isHovered ? AnnotationPalette.Fill(index) : Brushes.Transparent;
 
                 OverlayCanvas.Children.Add(poly);
                 DrawReadingAxisArrow(item.Bounds, item.ReadingAngleDegrees, offsetX, offsetY, scale, isHovered);
@@ -2383,9 +2381,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         double len = Math.Clamp(edge * 0.35, 14.0, 48.0);
         double tipX = cx + Math.Cos(rad) * len;
         double tipY = cy + Math.Sin(rad) * len;
-        var stroke = emphasized
-            ? ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.Orange)
-            : ResolveBrush("BrandBrush", Brushes.Orange);
+        // Always red so the reading-axis arrow never collides with per-box accent colors.
+        var stroke = ResolveBrush("ReadingAxisArrowBrush", Brushes.Red);
         double thickness = emphasized ? 2.4 : 1.6;
         double opacity = emphasized ? 1.0 : 0.85;
 
@@ -2476,16 +2473,18 @@ public partial class MainWindow : Window, IAsyncDisposable
             return;
         }
 
-        foreach (var line in ocrLines)
+        for (int index = 0; index < ocrLines.Length; index++)
         {
+            var line = ocrLines[index];
             var capturedLine = line;
+            var accent = AnnotationPalette.Stroke(index);
             string confText = line.Confidence.HasValue ? $" ({line.Confidence.Value * 100:0.#}%)" : "";
             var heading = new TextBlock
             {
                 Text = $"OCR{confText}",
                 FontSize = 11,
                 FontWeight = FontWeight.SemiBold,
-                Foreground = ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.DeepSkyBlue)
+                Foreground = accent
             };
             var content = new TextBlock
             {
@@ -2505,16 +2504,15 @@ public partial class MainWindow : Window, IAsyncDisposable
                              (_hoveredAnnotation is OcrLine o && o.Text == capturedLine.Text && o.Bounds.Equals(capturedLine.Bounds));
             var card = new Border
             {
-                Tag = capturedLine,
+                Tag = new ToastTag(capturedLine, index),
                 Child = body,
                 Cursor = new Cursor(StandardCursorType.Hand),
                 BorderThickness = new Thickness(3, 1, 1, 1),
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(10, 7),
                 Margin = new Thickness(0, 0, 4, 6),
-                BorderBrush = ResolveBrush("SymbologyBadgeOcrBorderBrush", Brushes.DeepSkyBlue),
-                Background = ResolveBrush(isHovered ? "SymbologyBadgeOcrBorderBrush" : "SymbologyBadgeOcrTintBrush",
-                    new SolidColorBrush(Color.FromArgb(140, 22, 34, 53)))
+                BorderBrush = AnnotationPalette.Border(index),
+                Background = isHovered ? AnnotationPalette.Fill(index) : AnnotationPalette.Tint(index)
             };
             ToolTip.SetTip(card, line.Text);
 
@@ -2585,18 +2583,22 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
     }
 
+    /// <summary>Toast card payload: the line it shows plus its frame color index.</summary>
+    private sealed record ToastTag(OcrLine Line, int ColorIndex);
+
     private void ApplyToastHoverStyles()
     {
         foreach (var child in ResultToastStackOcr.Children)
         {
-            if (child is not Border card || card.Tag is not OcrLine line) continue;
+            if (child is not Border card || card.Tag is not ToastTag tag) continue;
+            OcrLine line = tag.Line;
             bool isHovered = ReferenceEquals(_hoveredAnnotation, line) ||
                              (_hoveredAnnotation is OcrLine o &&
                               o.Text == line.Text &&
                               o.Bounds.Equals(line.Bounds));
-            card.Background = ResolveBrush(
-                isHovered ? "SymbologyBadgeOcrBorderBrush" : "SymbologyBadgeOcrTintBrush",
-                new SolidColorBrush(Color.FromArgb(140, 22, 34, 53)));
+            card.Background = isHovered
+                ? AnnotationPalette.Fill(tag.ColorIndex)
+                : AnnotationPalette.Tint(tag.ColorIndex);
         }
     }
 
