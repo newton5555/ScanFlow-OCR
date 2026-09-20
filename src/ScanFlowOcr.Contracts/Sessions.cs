@@ -38,7 +38,7 @@ public sealed record OutputRouteSnapshot(
 public sealed record SessionSnapshot(
     SessionState State, SessionProfile Profile, CaptureMode? NegotiatedCaptureMode,
     Guid? StreamEpoch, long ProfileRevision, string? FaultCode,
-    long FramesReceived, long FramesDropped, long LiveFrameBytes,
+    long FramesReceived, long FramesProcessed, long LiveFrameBytes,
     ImmutableArray<OutputRouteSnapshot> Outputs);
 
 // Events are UI/diagnostic notifications, not a reliable business output channel.

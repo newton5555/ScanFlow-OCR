@@ -80,6 +80,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private int _modeRequestRevision;
     private Point _dragStartPoint;
     private bool _isDraggingViewport;
+    // Drives bottom-right OCR toast highlight only (not overlay boxes).
     private object? _hoveredAnnotation;
 
     public MainWindow() : this(
@@ -201,8 +202,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (_activeSession is not null)
         {
             var snap = _activeSession.GetSnapshot();
-            double fps = UpdateMetricRate("session", snap.FramesReceived);
-            TxtSessionMetrics.Text = $"帧 {snap.FramesReceived} · {fps:0.0} FPS / 丢 {snap.FramesDropped}";
+            double fps = UpdateMetricRate("session", snap.FramesProcessed);
+            TxtSessionMetrics.Text = $"\u5e27 {snap.FramesReceived} \u00b7 {fps:0.0} FPS / \u5904\u7406 {snap.FramesProcessed}";
             TxtPreviewMetrics.Text = _sourceWidth > 0
                 ? $"{_sourceWidth}×{_sourceHeight} · {fps:0.0} FPS"
                 : "会话预览中";
@@ -239,7 +240,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
 
         UpdateMetricRate("idle", 0);
-        TxtSessionMetrics.Text = "帧 0 · 0.0 FPS / 丢 0";
+        TxtSessionMetrics.Text = "\u5e27 0 \u00b7 0.0 FPS / \u5904\u7406 0";
         TxtPreviewMetrics.Text = PreviewImage.Source is not null && _sourceWidth > 0
             ? $"静态图 {_sourceWidth}×{_sourceHeight}"
             : "未启用";
@@ -2288,19 +2289,17 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (_settings.ShowPreviewGuides)
             DrawPreviewGuides(offsetX, offsetY, displayW, displayH);
 
-        // Draw bounding boxes for OCR lines
+        // Draw bounding boxes for OCR lines (hover highlight is toast-only via _hoveredAnnotation).
         if (!_frameLines.IsDefaultOrEmpty)
         {
             foreach (var item in _frameLines)
             {
-                bool isHovered = ReferenceEquals(_hoveredAnnotation, item) ||
-                                 (_hoveredAnnotation is OcrLine o &&
-                                  o.Text == item.Text &&
-                                  o.Bounds.Equals(item.Bounds));
-
                 var poly = new Polygon
                 {
-                    StrokeThickness = isHovered ? 3 : 2,
+                    StrokeThickness = 2,
+                    Fill = Brushes.Transparent,
+                    Stroke = ResolveBrush("BrandBrush", Brushes.DodgerBlue),
+                    IsHitTestVisible = false,
                     Points =
                     [
                         new Point(offsetX + item.Bounds.P0.X * scale, offsetY + item.Bounds.P0.Y * scale),
@@ -2308,32 +2307,6 @@ public partial class MainWindow : Window, IAsyncDisposable
                         new Point(offsetX + item.Bounds.P2.X * scale, offsetY + item.Bounds.P2.Y * scale),
                         new Point(offsetX + item.Bounds.P3.X * scale, offsetY + item.Bounds.P3.Y * scale)
                     ]
-                };
-
-                if (isHovered)
-                {
-                    poly.Fill = ResolveBrush("SymbologyBadgeOcrTintBrush", new SolidColorBrush(Color.FromArgb(50, 0, 122, 255)));
-                    poly.Stroke = ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.DodgerBlue);
-                }
-                else
-                {
-                    poly.Fill = Brushes.Transparent;
-                    poly.Stroke = ResolveBrush("BrandBrush", Brushes.DodgerBlue);
-                }
-
-                var captured = item;
-                poly.PointerEntered += (_, _) =>
-                {
-                    _hoveredAnnotation = captured;
-                    RedrawOverlay();
-                };
-                poly.PointerExited += (_, _) =>
-                {
-                    if (ReferenceEquals(_hoveredAnnotation, captured))
-                    {
-                        _hoveredAnnotation = null;
-                        RedrawOverlay();
-                    }
                 };
 
                 OverlayCanvas.Children.Add(poly);
@@ -2391,7 +2364,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         OverlayCanvas.Children.Add(lineV);
     }
 
-    private void ReplaceResultToasts(ImmutableArray<OcrLine> ocrLines)
+    private void ReplaceResultToasts(ImmutableArray<OcrLine> ocrLines, bool scrollToEnd = true)
     {
         ResultToastStackOcr.Children.Clear();
         if (ocrLines.IsDefaultOrEmpty)
@@ -2453,21 +2426,24 @@ public partial class MainWindow : Window, IAsyncDisposable
             card.PointerEntered += (_, _) =>
             {
                 _hoveredAnnotation = capturedLine;
-                RedrawOverlay();
+                ApplyToastHoverStyles();
             };
             card.PointerExited += (_, _) =>
             {
-                if (ReferenceEquals(_hoveredAnnotation, capturedLine))
+                if (ReferenceEquals(_hoveredAnnotation, capturedLine) ||
+                    (_hoveredAnnotation is OcrLine o &&
+                     o.Text == capturedLine.Text &&
+                     o.Bounds.Equals(capturedLine.Bounds)))
                 {
                     _hoveredAnnotation = null;
-                    RedrawOverlay();
+                    ApplyToastHoverStyles();
                 }
             };
             ResultToastStackOcr.Children.Add(card);
         }
 
         ResultToastScrollerOcr.IsVisible = ResultToastStackOcr.Children.Count > 0;
-        if (ResultToastStackOcr.Children.Count > 0)
+        if (scrollToEnd && ResultToastStackOcr.Children.Count > 0)
         {
             ResultToastScrollerOcr.ScrollToEnd();
         }
@@ -2501,6 +2477,21 @@ public partial class MainWindow : Window, IAsyncDisposable
                     await StartScanningAsync();
                 e.Handled = true;
             }
+        }
+    }
+
+    private void ApplyToastHoverStyles()
+    {
+        foreach (var child in ResultToastStackOcr.Children)
+        {
+            if (child is not Border card || card.Tag is not OcrLine line) continue;
+            bool isHovered = ReferenceEquals(_hoveredAnnotation, line) ||
+                             (_hoveredAnnotation is OcrLine o &&
+                              o.Text == line.Text &&
+                              o.Bounds.Equals(line.Bounds));
+            card.Background = ResolveBrush(
+                isHovered ? "SymbologyBadgeOcrBorderBrush" : "SymbologyBadgeOcrTintBrush",
+                new SolidColorBrush(Color.FromArgb(140, 22, 34, 53)));
         }
     }
 

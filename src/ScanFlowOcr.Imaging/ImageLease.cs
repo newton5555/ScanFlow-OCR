@@ -7,8 +7,15 @@ namespace ScanFlowOcr.Imaging;
 // Bounded image storage. The allocator accounts for both checked-out and idle
 // native blocks, so the pool can reuse stable camera/preview sizes without
 // allowing its committed footprint to grow past the session limit.
+//
+// Idle buckets are keyed by *capacity* (not the caller's length). Allocate
+// rounds the requested length up to a size class (next power of two, minimum
+// 64 KiB for large frames; smaller requests still use the next power of two)
+// so variable JPEG sizes reuse the same idle blocks. The lease still exposes
+// only `length` bytes to callers via Memory.Slice.
 public sealed class ImageAllocator : IDisposable
 {
+    private const int MinSizeClass = 64 * 1024;
     private readonly object _gate = new();
     private readonly long _byteLimit;
     private readonly Dictionary<int, Stack<NativeImageMemory>> _idle = [];
@@ -33,21 +40,26 @@ public sealed class ImageAllocator : IDisposable
     {
         if (length <= 0 || length > _byteLimit) throw new InvalidOperationException("图像超过缓冲区限制。");
 
+        int capacity = RoundUpCapacity(length);
+        // If the size class would exceed the session limit, fall back to exact length
+        // so a single near-limit frame can still allocate.
+        if (capacity > _byteLimit) capacity = length;
+
         NativeImageMemory bytes;
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (!_idle.TryGetValue(length, out var bucket) || bucket.Count == 0)
+            if (!_idle.TryGetValue(capacity, out var bucket) || bucket.Count == 0)
             {
-                if (_committed > _byteLimit - length)
+                if (_committed > _byteLimit - capacity)
                     throw new InvalidOperationException("图像缓冲区已达到内存上限。");
-                bytes = new NativeImageMemory(length);
-                _committed += length;
+                bytes = new NativeImageMemory(capacity);
+                _committed += capacity;
             }
             else
             {
                 bytes = bucket.Pop();
-                if (bucket.Count == 0) _idle.Remove(length);
+                if (bucket.Count == 0) _idle.Remove(capacity);
             }
             _live += length;
         }
@@ -66,9 +78,35 @@ public sealed class ImageAllocator : IDisposable
         }
     }
 
-    // Stop/reconfigure calls this after all internal queues have been drained.
-    // Leases still held by a consumer are released normally and can be trimmed
-    // by the next stop or allocator disposal.
+    // Round requested length up to a reusable size class.
+    // Below 64 KiB: next power of two (keeps smoke/tiny buffers clustered).
+    // At/above 64 KiB: next power of two from 64 KiB upward (MJPEG jitter reuses).
+    internal static int RoundUpCapacity(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(length);
+        int rounded = NextPowerOfTwo(length);
+        if (length >= MinSizeClass)
+            return Math.Max(rounded, MinSizeClass);
+        return rounded;
+    }
+
+    private static int NextPowerOfTwo(int value)
+    {
+        if (value <= 1) return 1;
+        uint v = (uint)value - 1;
+        v |= v >> 1;
+        v |= v >> 2;
+        v |= v >> 4;
+        v |= v >> 8;
+        v |= v >> 16;
+        v++;
+        if (v > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(value));
+        return (int)v;
+    }
+
+    // Stop/reconfigure (and periodic idle-threshold trim during continuous scan)
+    // call this after queues are drained / between frames. Leases still held by a
+    // consumer are released normally and return to idle for the next trim.
     public void TrimExcess()
     {
         List<NativeImageMemory> blocks;
@@ -117,6 +155,7 @@ public sealed class ImageAllocator : IDisposable
             }
             else
             {
+                // Key by capacity so size-class peers share one idle bucket.
                 if (!_idle.TryGetValue(bytes.Capacity, out var bucket))
                     _idle.Add(bytes.Capacity, bucket = []);
                 bucket.Push(bytes);
@@ -126,7 +165,7 @@ public sealed class ImageAllocator : IDisposable
     }
 }
 
-// Exact-sized native blocks owned by ImageAllocator; blocks are reusable only
+// Size-class native blocks owned by ImageAllocator; blocks are reusable only
 // inside that allocator and are never retained by the process-wide ArrayPool.
 internal sealed unsafe class NativeImageMemory : MemoryManager<byte>
 {

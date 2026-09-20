@@ -53,6 +53,24 @@ allocator.TrimExcess();
 Check(allocator.CommittedBytes == 0 && allocator.IdleBytes == 0,
     "allocator trims idle native blocks");
 {
+    // Nearby JPEG-like sizes must share one power-of-two capacity bucket.
+    using (var first = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 5000, ImageTransform.Identity))
+    {
+        Check(first.WritableBuffer.Length == 5000, "lease exposes requested length only");
+        Check(allocator.CommittedBytes == 8192, "5000 rounds to 8KiB size class");
+    }
+    Check(allocator.IdleBytes == 8192, "idle tracks size-class capacity");
+    using (var second = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 6000, ImageTransform.Identity))
+    {
+        Check(second.WritableBuffer.Length == 6000, "reuse lease still exposes caller length");
+        Check(allocator.LiveBytes == 6000 && allocator.CommittedBytes == 8192,
+            "allocator reuses size-class block across 5000/6000");
+    }
+    allocator.TrimExcess();
+    Check(allocator.CommittedBytes == 0 && allocator.IdleBytes == 0,
+        "TrimExcess clears size-class idle blocks");
+}
+{
     using var bounded = new ImageAllocator(4096);
     using (var held = bounded.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 4096, ImageTransform.Identity)) { }
     bool rejectedWhileIdle = false;

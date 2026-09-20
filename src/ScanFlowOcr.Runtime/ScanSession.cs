@@ -26,7 +26,7 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
     private SessionState _state = SessionState.Created;
     private string? _fault;
     private Guid _epoch;
-    private long _revision = 1, _received, _dropped, _lastPreview, _skippedEvents, _lastDedupeWarningTimestamp, _lastOutputWarningTimestamp;
+    private long _revision = 1, _received, _processed, _dropped, _lastPreview, _skippedEvents, _lastDedupeWarningTimestamp, _lastOutputWarningTimestamp;
     private volatile bool _accepting;
     private int _eventReader, _previewReader;
     private ICameraSession? _camera;
@@ -72,7 +72,7 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
     {
         lock (_stateGate)
             return new(_state, _profile, _camera?.NegotiatedMode, _epoch == Guid.Empty ? null : _epoch, _revision, _fault,
-                Interlocked.Read(ref _received), Interlocked.Read(ref _dropped), _allocator.CommittedBytes,
+                Interlocked.Read(ref _received), Interlocked.Read(ref _processed), _allocator.CommittedBytes,
                 _delivery is null || _profile.Outputs.IsDefaultOrEmpty ? [] :
                     _delivery.GetStatus().Routes.Where(r => r.Enabled)
                         .Select(r => new OutputRouteSnapshot(r.SinkId, r.PendingCount,
@@ -239,6 +239,7 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
             var id = new AnalysisId(input.Stamp.Id, _revision);
             var deadline = Stopwatch.GetTimestamp() + (long)(_profile.Scheduling.OcrBudget.TotalSeconds * Stopwatch.Frequency);
             var batch = await _ocrReader!.ReadAsync(input, new(id, deadline), CancellationToken.None).ConfigureAwait(false);
+            Interlocked.Increment(ref _processed);
             if (!_accepting) return;
             if (batch.Analysis != id) throw new InvalidOperationException("OCR 返回的帧身份与请求不匹配。");
             var items = batch.Items.Select(line => line with { Bounds = Map(line.Bounds, input.ImageToSource) }).ToImmutableArray();
@@ -252,7 +253,21 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
             }
             if (batch.Status != StageStatus.Completed) return;
             await AcceptRecordAsync(id, input.Stamp, items).ConfigureAwait(false);
+            // Release idle size-class blocks when they pile up (variable JPEG sizes).
+            // Prefer idle-threshold over every-frame trim so steady-state reuse still works.
+            MaybeTrimIdle();
         }
+    }
+
+    // Trim when idle exceeds ~25% of RetainedByteLimit or 2× MaxFrameBytes.
+    private void MaybeTrimIdle()
+    {
+        long idle = _allocator.IdleBytes;
+        if (idle <= 0) return;
+        long limit = _profile.Scheduling.RetainedByteLimit;
+        long maxFrame = _profile.Scheduling.MaxFrameBytes;
+        if (idle > (limit >> 2) || idle > maxFrame * 2)
+            _allocator.TrimExcess();
     }
 
     private (IImageLease? Decoded, IImageLease? Cropped, ImageInput Input) PrepareOcrInput(

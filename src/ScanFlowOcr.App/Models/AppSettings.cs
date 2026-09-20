@@ -225,7 +225,9 @@ public sealed class AppSettings
             MaxResultAge: TimeSpan.FromMilliseconds(OcrTimeoutMs + 3000),
             OcrBudget: ocrBudget,
             MaxFrameBytes: 5120L * 5120L * 4L,
-            RetainedByteLimit: 5120L * 5120L * 4L * 4);
+            // ~128 MiB: a few full BGR frames + JPEG/size-class idle for 1080p/4K MJPEG.
+            // Must stay >= MaxFrameBytes (validation). Was ~400 MiB (×4) which let idle grow.
+            RetainedByteLimit: 128L * 1024L * 1024L);
 
         return new SessionProfile(
             SchemaVersion: 1,
