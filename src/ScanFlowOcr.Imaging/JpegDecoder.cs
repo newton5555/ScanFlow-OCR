@@ -69,12 +69,9 @@ public sealed unsafe class JpegDecoder : IDisposable
             if (w != jpeg.Layout.Width || h != jpeg.Layout.Height) throw new InvalidDataException("JPEG 尺寸与相机协商模式不一致。");
             int originalWidth = w, originalHeight = h;
             // Native JPEG IDCT scaling avoids allocating full-resolution preview pixels.
-            int divisor = 1;
-            if (maxWidth > 0 && maxHeight > 0)
-                while (divisor < 8 &&
-                       (w + divisor * 2 - 1) / (divisor * 2) >= maxWidth &&
-                       (h + divisor * 2 - 1) / (divisor * 2) >= maxHeight)
-                    divisor *= 2;
+            // Pick the TurboJPEG divisor whose decoded dimensions are closest to
+            // the display cap; the following managed resize is then small.
+            int divisor = ChoosePreviewDivisor(w, h, maxWidth, maxHeight);
             w = (w + divisor - 1) / divisor;
             h = (h + divisor - 1) / divisor;
             int stride = checked(w * bytesPerPixel);
@@ -125,5 +122,30 @@ public sealed unsafe class JpegDecoder : IDisposable
         PixelFormat.Bgra32 => 4,
         _ => throw new ArgumentOutOfRangeException(nameof(format))
     };
+
+    private static int ChoosePreviewDivisor(int width, int height, int maxWidth, int maxHeight)
+    {
+        if (maxWidth <= 0 || maxHeight <= 0 || (width <= maxWidth && height <= maxHeight))
+            return 1;
+
+        int best = 1;
+        double bestScore = double.PositiveInfinity;
+        for (int divisor = 1; divisor <= 8; divisor *= 2)
+        {
+            double decodedWidth = Math.Ceiling(width / (double)divisor);
+            double decodedHeight = Math.Ceiling(height / (double)divisor);
+            double widthRatio = decodedWidth / maxWidth;
+            double heightRatio = decodedHeight / maxHeight;
+            double score = Math.Max(Math.Abs(Math.Log(widthRatio)), Math.Abs(Math.Log(heightRatio)));
+            if (score < bestScore - 1e-9 ||
+                (Math.Abs(score - bestScore) <= 1e-9 && divisor < best))
+            {
+                best = divisor;
+                bestScore = score;
+            }
+        }
+        return best;
+    }
+
     public void Dispose() { if (_handle == 0) return; _destroy(_handle); _handle = 0; NativeLibrary.Free(_library); }
 }

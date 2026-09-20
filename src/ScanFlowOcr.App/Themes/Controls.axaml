@@ -24,6 +24,45 @@
     <Setter Property="FontFamily" Value="Cascadia Code, Consolas, monospace" />
   </Style>
 
+  <!-- Vector Icon Helpers (Ensures 24x24 Lucide/Feather stroke geometry renders with razor sharpness) -->
+  <Style Selector="Path.icon-stroke">
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="StrokeThickness" Value="1.5" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stretch" Value="Uniform" />
+  </Style>
+  <Style Selector="Path.icon-stroke-brand">
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource BrandBrush}" />
+    <Setter Property="StrokeThickness" Value="1.5" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stretch" Value="Uniform" />
+  </Style>
+  <Style Selector="Path.icon-stroke-muted">
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="StrokeThickness" Value="1.5" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stretch" Value="Uniform" />
+  </Style>
+  <Style Selector="Path.icon-stroke-danger">
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stroke" Value="{DynamicResource DangerTextBrush}" />
+    <Setter Property="StrokeThickness" Value="1.5" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Stretch" Value="Uniform" />
+  </Style>
+  <Style Selector="Path.icon-fill">
+    <Setter Property="StrokeThickness" Value="0" />
+    <Setter Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Stretch" Value="Uniform" />
+  </Style>
+
   <!-- Panel and Card Containers -->
   <Style Selector="Border.panel-card">
     <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
@@ -262,7 +301,7 @@
   </Style>
   <Style Selector="Button.tool-zoom-value">
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="FontFamily" Value="Cascadia Code, Consolas, monospace" />
+    <Setter Property="FontFamily" Value="Inter, Segoe UI, sans-serif" />
   </Style>
 
   <Style Selector="Button.danger">
@@ -367,13 +406,16 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.caption Path">
-    <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="Stroke" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="StrokeThickness" Value="1.1" />
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stretch" Value="Uniform" />
   </Style>
   <Style Selector="Button.caption:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource SurfaceHoverBackgroundBrush}" />
   </Style>
   <Style Selector="Button.caption:pointerover Path">
-    <Setter Property="Fill" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Stroke" Value="{DynamicResource TextPrimaryBrush}" />
   </Style>
   <Style Selector="Button.caption:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource BorderMediumBrush}" />
@@ -398,19 +440,22 @@
     <Setter Property="VerticalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.caption-close Path">
-    <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="Stroke" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="StrokeThickness" Value="1.1" />
+    <Setter Property="Fill" Value="Transparent" />
+    <Setter Property="Stretch" Value="Uniform" />
   </Style>
   <Style Selector="Button.caption-close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="#e81123" />
   </Style>
   <Style Selector="Button.caption-close:pointerover Path">
-    <Setter Property="Fill" Value="#ffffff" />
+    <Setter Property="Stroke" Value="#ffffff" />
   </Style>
   <Style Selector="Button.caption-close:pressed /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="#b91c1c" />
   </Style>
   <Style Selector="Button.caption-close:pressed Path">
-    <Setter Property="Fill" Value="#ffffff" />
+    <Setter Property="Stroke" Value="#ffffff" />
   </Style>
 
   <!-- ==================== INPUTS & CONTROLS ==================== -->

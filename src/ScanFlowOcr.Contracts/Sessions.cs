@@ -33,6 +33,8 @@ public sealed record SessionProfile(
 
 public sealed record OutputRouteSnapshot(
     string SinkId, int PendingCount, bool AdmissionPaused, DeliveryReceipt? LastReceipt);
+// LiveFrameBytes is the allocator-owned native image footprint, including
+// reusable idle blocks, so diagnostics reflect the configured memory ceiling.
 public sealed record SessionSnapshot(
     SessionState State, SessionProfile Profile, CaptureMode? NegotiatedCaptureMode,
     Guid? StreamEpoch, long ProfileRevision, string? FaultCode,

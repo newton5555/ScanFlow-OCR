@@ -72,11 +72,30 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
     {
         lock (_stateGate)
             return new(_state, _profile, _camera?.NegotiatedMode, _epoch == Guid.Empty ? null : _epoch, _revision, _fault,
-                Interlocked.Read(ref _received), Interlocked.Read(ref _dropped), _allocator.LiveBytes,
+                Interlocked.Read(ref _received), Interlocked.Read(ref _dropped), _allocator.CommittedBytes,
                 _delivery is null || _profile.Outputs.IsDefaultOrEmpty ? [] :
                     _delivery.GetStatus().Routes.Where(r => r.Enabled)
                         .Select(r => new OutputRouteSnapshot(r.SinkId, r.PendingCount,
                             r.PendingCount >= r.Capacity, null)).ToImmutableArray());
+    }
+
+    // Preview quality can follow viewport zoom without rebuilding the OCR reader
+    // or camera session. OCR continues to use the full-resolution pending frame.
+    public void SetPreviewBounds(int maxWidth, int maxHeight)
+    {
+        if (maxWidth < 0 || maxHeight < 0 || (maxWidth == 0) != (maxHeight == 0)) return;
+        _allocator.TrimExcess();
+        lock (_stateGate)
+        {
+            _profile = _profile with
+            {
+                Preview = _profile.Preview with
+                {
+                    MaxWidth = maxWidth,
+                    MaxHeight = maxHeight
+                }
+            };
+        }
     }
 
     private void SetState(SessionState state, string? reason = null)
@@ -448,11 +467,12 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
                         if (!_accepting) continue;
                         if (frame.Input.Layout.Encoding == FrameEncoding.Raw)
                             RawImages.ValidateBgra(frame.Input);
+                        var previewProfile = _profile.Preview;
                         IImageLease color;
                         try
                         {
                             color = frame.Input.Layout.Encoding == FrameEncoding.Jpeg
-                                ? decoder.DecodePreview(frame.Input, _allocator, _profile.Preview.MaxWidth, _profile.Preview.MaxHeight)
+                                ? decoder.DecodePreview(frame.Input, _allocator, previewProfile.MaxWidth, previewProfile.MaxHeight)
                                 : frame.Retain();
                         }
                         catch (InvalidDataException)
@@ -463,10 +483,10 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
                         using (color)
                         {
                             var input = color.Input;
-                            bool nativePreview = _profile.Preview.MaxWidth == 0 && _profile.Preview.MaxHeight == 0;
+                            bool nativePreview = previewProfile.MaxWidth == 0 && previewProfile.MaxHeight == 0;
                             double scale = nativePreview ? 1 : Math.Min(1, Math.Min(
-                                (double)_profile.Preview.MaxWidth / input.Layout.Width,
-                                (double)_profile.Preview.MaxHeight / input.Layout.Height));
+                                (double)previewProfile.MaxWidth / input.Layout.Width,
+                                (double)previewProfile.MaxHeight / input.Layout.Height));
                             if (scale >= 1)
                             {
                                 var full = color.Retain();
@@ -535,6 +555,7 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
             await Attempt(async () => { await _ocrReader.DisposeAsync().ConfigureAwait(false); _ocrReader = null; }).ConfigureAwait(false);
         if (_camera is not null)
             await Attempt(async () => { await _camera.DisposeAsync().ConfigureAwait(false); _camera = null; }).ConfigureAwait(false);
+        _allocator.TrimExcess();
         if (errors.Count > 0)
         {
             var error = new AggregateException("停止扫描时发生清理错误。", errors);
@@ -633,6 +654,7 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
             try { await StopCore().ConfigureAwait(false); }
             finally
             {
+                _allocator.Dispose();
                 if (_camera is null && _ocrReader is null)
                 {
                     SetState(SessionState.Disposed);

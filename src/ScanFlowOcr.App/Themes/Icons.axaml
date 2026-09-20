@@ -1,0 +1,201 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- =========================================================================
+       ScanFlow-OCR 顶尖工业级矢量图标系统 (Precision 24×24 Vector Geometry)
+       - 统一 24×24 视口，严格遵循工业人机工学与 Feather / Lucide 黄金比例设计规范
+       - 骨架全部采用纯净单线几何，配合 StrokeThickness="1.5"、Round Cap & Join 平滑渲染
+       - 彻底消除多重边框手写膨胀带来的重叠粘连、黑块与锐利度损失
+       - 针对 Play / Stop 等操作动作采用纯多边形实心字形（Fill 模式）
+       - 完美适配 100%、125%、150%、200% 任意高 DPI，抗锯齿如刀锋般锐利
+       ========================================================================= -->
+
+  <!-- 1. Brand Logo: 工业扫码取景框 + OCR 高速扫描激光与数据线 -->
+  <StreamGeometry x:Key="GeoBrandLogo">
+    M 3,8 V 5 C 3,3.9 3.9,3 5,3 H 8
+    M 16,3 H 19 C 20.1,3 21,3.9 21,5 V 8
+    M 3,16 V 19 C 3,20.1 3.9,21 5,21 H 8
+    M 16,21 H 19 C 20.1,21 21,20.1 21,19 V 16
+    M 7,9.5 H 17
+    M 6,12 H 18
+    M 7,14.5 H 14
+  </StreamGeometry>
+
+  <!-- 2. Settings Gear: 工业机械精密六齿啮合齿轮 (带中心圆孔) -->
+  <StreamGeometry x:Key="GeoGear">
+    M 12,9 A 3,3 0 1 0 12,15 A 3,3 0 1 0 12,9 Z
+    M 19.4,15 A 1.65,1.65 0 0 0 19.73,16.82 L 19.79,16.88 A 2,2 0 0 1 16.96,19.71 L 16.9,19.65 A 1.65,1.65 0 0 0 15.08,19.32 A 1.65,1.65 0 0 0 14.08,20.83 V 21 A 2,2 0 0 1 10.08,21 V 20.91 A 1.65,1.65 0 0 0 9.08,19.4 A 1.65,1.65 0 0 0 7.26,19.73 L 7.2,19.79 A 2,2 0 0 1 4.37,16.96 L 4.43,16.9 A 1.65,1.65 0 0 0 4.76,15.08 A 1.65,1.65 0 0 0 3.25,14.08 H 3 A 2,2 0 0 1 3,10.08 H 3.09 A 1.65,1.65 0 0 0 4.6,9.08 A 1.65,1.65 0 0 0 4.27,7.26 L 4.21,7.2 A 2,2 0 0 1 7.04,4.37 L 7.1,4.43 A 1.65,1.65 0 0 0 8.92,4.76 A 1.65,1.65 0 0 0 9.92,3.25 V 3 A 2,2 0 0 1 13.92,3 V 3.09 A 1.65,1.65 0 0 0 14.92,4.6 A 1.65,1.65 0 0 0 16.74,4.27 L 16.8,4.21 A 2,2 0 0 1 19.63,7.04 L 19.57,7.1 A 1.65,1.65 0 0 0 19.24,8.92 V 9 A 1.65,1.65 0 0 0 20.75,10 H 21 A 2,2 0 0 1 21,14 H 20.91 A 1.65,1.65 0 0 0 19.4,15 Z
+  </StreamGeometry>
+
+  <!-- 3. Hardware Camera: 工业光学相机与同心聚焦镜头 -->
+  <StreamGeometry x:Key="GeoCamera">
+    M 23,19 A 2,2 0 0 1 21,21 H 3 A 2,2 0 0 1 1,19 V 8 A 2,2 0 0 1 3,6 H 7 L 9,3 H 15 L 17,6 H 21 A 2,2 0 0 1 23,8 Z
+    M 12,17 A 4,4 0 1 0 12,9 A 4,4 0 1 0 12,17 Z
+  </StreamGeometry>
+
+  <!-- 4. Sliders: 精密仪器三通道调节滑块 -->
+  <StreamGeometry x:Key="GeoSliders">
+    M 4,21 V 14
+    M 4,10 V 3
+    M 12,21 V 12
+    M 12,8 V 3
+    M 20,21 V 16
+    M 20,12 V 3
+    M 1,14 H 7
+    M 9,8 H 15
+    M 17,16 H 23
+  </StreamGeometry>
+
+  <!-- 5. AI Brain: 神经网络推理引擎与深度学习模型 -->
+  <StreamGeometry x:Key="GeoBrain">
+    M 9.5,2 A 4.5,4.5 0 0 0 5,6.5 C 5,7.27 5.19,8 5.53,8.65 A 4.5,4.5 0 0 0 4,12 C 4,13.88 5.16,15.49 6.81,16.14 A 3.5,3.5 0 0 0 10,21 A 3.5,3.5 0 0 0 12,20.38 A 3.5,3.5 0 0 0 14,21 A 3.5,3.5 0 0 0 17.19,16.14 C 18.84,15.49 20,13.88 20,12 A 4.5,4.5 0 0 0 18.47,8.65 C 18.81,8 19,7.27 19,6.5 A 4.5,4.5 0 0 0 14.5,2 C 13.47,2 12.54,2.44 12,3.15 C 11.46,2.44 10.53,2 9.5,2 Z
+    M 12,4 V 20
+    M 6,10 H 12
+    M 12,14 H 18
+  </StreamGeometry>
+
+  <!-- 6. Hardware Chip: 硬件加速与嵌入式处理器芯片 -->
+  <StreamGeometry x:Key="GeoChip">
+    M 5,5 H 19 V 19 H 5 Z
+    M 9,9 H 15 V 15 H 9 Z
+    M 9,1 V 5
+    M 15,1 V 5
+    M 9,19 V 23
+    M 15,19 V 23
+    M 1,9 H 5
+    M 1,15 H 5
+    M 19,9 H 23
+    M 19,15 H 23
+  </StreamGeometry>
+
+  <!-- 7. Terminal: 键盘模拟与工业控制台命令提示符 -->
+  <StreamGeometry x:Key="GeoTerminal">
+    M 4,17 L 10,11 L 4,5
+    M 12,19 H 20
+  </StreamGeometry>
+
+  <!-- 8. Database: SQLite 嵌入式持久化事务数据库 (三层精密圆柱体) -->
+  <StreamGeometry x:Key="GeoDatabase">
+    M 21,5 C 21,6.66 16.97,8 12,8 C 7.03,8 3,6.66 3,5 C 3,3.34 7.03,2 12,2 C 16.97,2 21,3.34 21,5 Z
+    M 21,12 C 21,13.66 16.97,15 12,15 C 7.03,15 3,13.66 3,12
+    M 3,5 V 19 C 3,20.66 7.03,22 12,22 C 16.97,22 21,20.66 21,19 V 5
+  </StreamGeometry>
+
+  <!-- 9. MQTT IoT: 物联网云端发布订阅中继节点 -->
+  <StreamGeometry x:Key="GeoMqtt">
+    M 17.5,19 H 6 C 3.79,19 2,17.21 2,15 C 2,12.95 3.54,11.24 5.56,11.03 C 6.07,7.64 8.98,5 12.5,5 C 16.28,5 19.37,7.99 19.5,11.75 C 20.95,12.44 22,13.9 22,15.6 C 22,17.48 20,19 17.5,19 Z
+  </StreamGeometry>
+
+  <!-- 10. TCP Network: TCP/IP 流式套接字通信网络球 -->
+  <StreamGeometry x:Key="GeoTcp">
+    M 12,2 C 6.48,2 2,6.48 2,12 C 2,17.52 6.48,22 12,22 C 17.52,22 22,17.52 22,12 C 22,6.48 17.52,2 12,2 Z
+    M 2,12 H 22
+    M 12,2 C 14.5,5.5 16,8.5 16,12 C 16,15.5 14.5,18.5 12,22 C 9.5,18.5 8,15.5 8,12 C 8,8.5 9.5,5.5 12,2 Z
+  </StreamGeometry>
+
+  <!-- 11. Pulse Live: 实时数据流高频采样脉冲波形 -->
+  <StreamGeometry x:Key="GeoPulseLive">
+    M 1,12 H 5 L 8,4 L 12,20 L 15,10 L 17,14 L 19,12 H 23
+  </StreamGeometry>
+
+  <!-- 12. Send: 外部输出路由与即时交付纸飞机 -->
+  <StreamGeometry x:Key="GeoSend">
+    M 22,2 L 11,13
+    M 22,2 L 15,22 L 11,13 L 2,9 Z
+  </StreamGeometry>
+
+  <!-- 13. Search: 45° 工业精密放大镜搜索 -->
+  <StreamGeometry x:Key="GeoSearch">
+    M 11,19 A 8,8 0 1 0 11,3 A 8,8 0 1 0 11,19 Z
+    M 21,21 L 16.65,16.65
+  </StreamGeometry>
+
+  <!-- 14. Copy: 双层重叠卡片剪贴板复制 -->
+  <StreamGeometry x:Key="GeoCopy">
+    M 9,2 H 19 A 2,2 0 0 1 21,4 V 14 A 2,2 0 0 1 19,16 H 9 A 2,2 0 0 1 7,14 V 4 A 2,2 0 0 1 9,2 Z
+    M 5,7 H 4 A 2,2 0 0 0 2,9 V 19 A 2,2 0 0 0 4,21 H 14 A 2,2 0 0 0 16,19 V 18
+  </StreamGeometry>
+
+  <!-- 15. Trash: 垃圾桶与列表清空 (带桶盖把手与加强肋) -->
+  <StreamGeometry x:Key="GeoTrash">
+    M 3,6 H 21
+    M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6
+    M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6
+    M 10,11 V 17
+    M 14,11 V 17
+  </StreamGeometry>
+
+  <!-- 16. Image: 图像相框与样本文件 -->
+  <StreamGeometry x:Key="GeoImage">
+    M 21,19 V 5 A 2,2 0 0 0 19,3 H 5 A 2,2 0 0 0 3,5 V 19 A 2,2 0 0 0 5,21 H 19 A 2,2 0 0 0 21,19 Z
+    M 8.5,13.5 L 11,16.5 L 14.5,12 L 19,18 H 5 Z
+    M 8.5,8.5 A 1.5,1.5 0 1 0 8.5,5.5 A 1.5,1.5 0 0 0 8.5,8.5 Z
+  </StreamGeometry>
+
+  <!-- 17. Action Controls: Play & Stop 实心操作符 -->
+  <StreamGeometry x:Key="GeoPlay">M 5,3 L 19,12 L 5,21 Z</StreamGeometry>
+  <StreamGeometry x:Key="GeoStop">M 4,4 H 20 V 20 H 4 Z</StreamGeometry>
+
+  <!-- 18. Precision Reticle & Crosshair: 视口中心靶心与十字导引标尺 -->
+  <StreamGeometry x:Key="GeoReticleCrosshair">
+    M 12,2 V 7
+    M 12,17 V 22
+    M 2,12 H 7
+    M 17,12 H 22
+    M 12,6 A 6,6 0 1 0 12,18 A 6,6 0 1 0 12,6 Z
+    M 12,10 A 2,2 0 1 0 12,14 A 2,2 0 1 0 12,10 Z
+  </StreamGeometry>
+
+  <!-- 19. Framing Corners: 取景区域四角微标 -->
+  <StreamGeometry x:Key="GeoCornerTL">M 2,14 V 6 C 2,3.8 3.8,2 6,2 H 14</StreamGeometry>
+  <StreamGeometry x:Key="GeoCornerTR">M 22,14 V 6 C 22,3.8 20.2,2 18,2 H 10</StreamGeometry>
+  <StreamGeometry x:Key="GeoCornerBL">M 2,10 V 18 C 2,20.2 3.8,22 6,22 H 14</StreamGeometry>
+  <StreamGeometry x:Key="GeoCornerBR">M 22,10 V 18 C 22,20.2 20.2,22 18,22 H 10</StreamGeometry>
+
+  <!-- 20. Chevrons: 工业平滑折角指示箭头 -->
+  <StreamGeometry x:Key="GeoChevronDown">M 6,9 L 12,15 L 18,9</StreamGeometry>
+  <StreamGeometry x:Key="GeoChevronUp">M 18,15 L 12,9 L 6,15</StreamGeometry>
+  <StreamGeometry x:Key="GeoChevronRight">M 9,18 L 15,12 L 9,6</StreamGeometry>
+  <StreamGeometry x:Key="GeoChevronLeft">M 15,18 L 9,12 L 15,6</StreamGeometry>
+
+  <!-- 21. Themes: Sun & Moon 浅色/深色主题指示 -->
+  <StreamGeometry x:Key="GeoSun">
+    M 12,7 A 5,5 0 1 0 12,17 A 5,5 0 1 0 12,7 Z
+    M 12,1 V 3
+    M 12,21 V 23
+    M 1,12 H 3
+    M 21,12 H 23
+    M 4.22,4.22 L 5.64,5.64
+    M 18.36,18.36 L 19.78,19.78
+    M 4.22,19.78 L 5.64,18.36
+    M 18.36,5.64 L 19.78,4.22
+  </StreamGeometry>
+  <StreamGeometry x:Key="GeoMoon">
+    M 21,12.79 A 9,9 0 1 1 11.21,3 A 7,7 0 0 0 21,12.79 Z
+  </StreamGeometry>
+
+  <!-- 22. Status & Refresh: 状态反馈与重置 -->
+  <StreamGeometry x:Key="GeoRefresh">
+    M 23,4 V 10 H 17
+    M 1,20 V 14 H 7
+    M 3.51,9 A 9,9 0 0 1 19.36,5.64 L 23,10
+    M 1,14 L 4.64,18.36 A 9,9 0 0 0 20.49,15
+  </StreamGeometry>
+  <StreamGeometry x:Key="GeoCheckCircle">
+    M 22,11.08 V 12 A 10,10 0 1 1 16.07,3.51
+    M 22,4 L 12,14.01 L 9,11.01
+  </StreamGeometry>
+  <StreamGeometry x:Key="GeoAlertCircle">
+    M 12,2 C 6.48,2 2,6.48 2,12 C 2,17.52 6.48,22 12,22 C 17.52,22 22,17.52 22,12 C 22,6.48 17.52,2 12,2 Z
+    M 12,8 V 12
+    M 12,16 H 12.01
+  </StreamGeometry>
+
+  <!-- 23. Windows Caption Buttons: 标题栏控制微标 (10×10 视口原生对齐) -->
+  <!-- Keep a half-stroke inset so the one-pixel minimize line is not clipped. -->
+  <StreamGeometry x:Key="GeoWindowMinimize">M 1,5 H 9</StreamGeometry>
+  <StreamGeometry x:Key="GeoWindowMaximize">M 0.5,0.5 H 9.5 V 9.5 H 0.5 Z</StreamGeometry>
+  <StreamGeometry x:Key="GeoWindowRestore">M 2.5,0.5 H 9.5 V 7.5 H 7.5 M 0.5,2.5 H 7.5 V 9.5 H 0.5 Z</StreamGeometry>
+  <StreamGeometry x:Key="GeoWindowClose">M 0.7,0.7 L 9.3,9.3 M 9.3,0.7 L 0.7,9.3</StreamGeometry>
+
+</ResourceDictionary>

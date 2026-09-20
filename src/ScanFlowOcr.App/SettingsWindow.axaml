@@ -1,9 +1,10 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="ScanFlowOcr.App.SettingsWindow"
+        Classes="settings-window"
         Title="系统设置 · ScanFlow-OCR"
-        Width="680" Height="620"
-        MinWidth="580" MinHeight="500"
+        Width="760" Height="700"
+        MinWidth="660" MinHeight="560"
         WindowStartupLocation="CenterOwner"
         ExtendClientAreaToDecorationsHint="True"
         ExtendClientAreaTitleBarHeightHint="-1"
@@ -11,28 +12,84 @@
         Background="{DynamicResource AppBackgroundBrush}"
         Foreground="{DynamicResource TextPrimaryBrush}">
 
-  <Border BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
-    <Grid RowDefinitions="42,Auto,*,Auto,Auto">
+  <Window.Styles>
+    <Style Selector="TextBlock.settings-label">
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.settings-description">
+      <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.settings-section-title">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.settings-note">
+      <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.settings-compact">
+      <Setter Property="Height" Value="30" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.settings-input">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ComboBox.settings-input">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border.settings-subsection">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBackgroundBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="12,10" />
+    </Style>
+    <Style Selector="Border.settings-group">
+      <Setter Property="Padding" Value="16,14" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Padding" Value="16,8" />
+    </Style>
+    <Style Selector="RadioButton">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+  </Window.Styles>
 
-      <!-- 0: Title Bar (42px) -->
-      <Border x:Name="TitleBarBorder" Grid.Row="0" Height="42" Background="{DynamicResource SurfaceBackgroundBrush}"
+  <Border BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1">
+    <Grid RowDefinitions="48,42,*,Auto,58">
+
+      <!-- 0: Title Bar -->
+      <Border x:Name="TitleBarBorder" Grid.Row="0" Height="48" Background="{DynamicResource SurfaceBackgroundBrush}"
               BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
               PointerPressed="OnTitleBarPointerPressed">
         <Grid ColumnDefinitions="Auto,*,Auto">
-          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="14,0,0,0">
-            <Border Width="22" Height="22" CornerRadius="4"
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="9" VerticalAlignment="Center" Margin="16,0,0,0">
+            <Border Width="24" Height="24" CornerRadius="5"
                     Background="{DynamicResource BrandSoftBrush}"
                     BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-              <Path Data="{StaticResource GeoGear}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Path Data="{StaticResource GeoGear}" Classes="icon-stroke-brand" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
-            <TextBlock Text="系统设置" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
-            <Border Classes="chip" VerticalAlignment="Center">
-              <TextBlock Text="ScanFlow-OCR" Classes="muted" />
+            <TextBlock Text="系统设置" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+            <Border Classes="chip" VerticalAlignment="Center" Padding="7,2">
+              <TextBlock Text="ScanFlow-OCR" Classes="muted" FontSize="10" />
             </Border>
           </StackPanel>
 
           <!-- Right: Close Button -->
-          <Grid Grid.Column="2" Width="46" Height="42" VerticalAlignment="Center">
+          <Grid Grid.Column="2" Width="48" Height="48" VerticalAlignment="Center">
             <Button x:Name="BtnCloseWindow" Classes="caption-close" ToolTip.Tip="关闭" Click="OnCloseWindowClick">
               <Path Data="{StaticResource GeoWindowClose}" Width="10" Height="10" Stretch="Uniform" />
             </Button>
@@ -43,16 +100,29 @@
     <!-- 1: Sub-header Tip Banner -->
     <Border Grid.Row="1" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
             BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,0,0,1"
-            Padding="16,8">
-      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <Ellipse Width="5" Height="5" Fill="{DynamicResource BrandBrush}" VerticalAlignment="Center" />
-        <TextBlock Text="配置修改暂存于草稿中，点击【应用并保存】后立即生效；点击【取消】还原初始状态。"
-                   FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-      </StackPanel>
+            Padding="16,0">
+      <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+        <Border Width="20" Height="20" CornerRadius="10"
+                Background="{DynamicResource BrandSoftBrush}"
+                BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1"
+                VerticalAlignment="Center">
+          <Ellipse Width="6" Height="6" Fill="{DynamicResource BrandBrush}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <StackPanel Grid.Column="1" Margin="10,0,0,0" Spacing="1" VerticalAlignment="Center">
+          <TextBlock Text="设置草稿" FontSize="11" FontWeight="SemiBold"
+                     Foreground="{DynamicResource TextPrimaryBrush}" />
+          <TextBlock Text="修改仅在点击“应用并保存”后生效，取消则恢复打开窗口时的配置。"
+                     Classes="settings-note" />
+        </StackPanel>
+        <Border Grid.Column="2" Classes="chip" Padding="7,2" VerticalAlignment="Center">
+          <TextBlock Text="待应用" FontSize="10" Foreground="{DynamicResource TextMutedBrush}" />
+        </Border>
+      </Grid>
     </Border>
 
     <!-- 2: 4-Tab Content -->
-    <Grid Grid.Row="2" Margin="16,8,16,6">
+    <Grid Grid.Row="2" Margin="16,10,16,8">
       <TabControl x:Name="SettingsTabControl">
 
         <!-- Tab 1: 相机与采集 -->
@@ -66,19 +136,19 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoCamera}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoCamera}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="相机设备与工作模式" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="相机设备与工作模式" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="选择用于 OCR 连续采样的物理相机或图像输入源及对应工作模式" Classes="muted" />
+                  <TextBlock Text="选择用于 OCR 连续采样的物理相机或图像输入源及对应工作模式" Classes="settings-description" />
 
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="选择设备" />
-                    <ComboBox x:Name="SettingsCameraDeviceCombo" Grid.Column="1" Height="32"
+                    <TextBlock Classes="settings-label" Text="选择设备" />
+                    <ComboBox x:Name="SettingsCameraDeviceCombo" Classes="settings-input" Grid.Column="1"
                               SelectionChanged="OnSettingsCameraDeviceChanged" />
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="工作模式" />
-                    <ComboBox x:Name="SettingsCameraModeCombo" Grid.Row="1" Grid.Column="1" Height="32" />
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="工作模式" />
+                    <ComboBox x:Name="SettingsCameraModeCombo" Classes="settings-input" Grid.Row="1" Grid.Column="1" />
                   </Grid>
 
                   <!-- 兼容隐藏索引，无设备枚举时仍生效 -->
@@ -86,7 +156,7 @@
                     <TextBox x:Name="PreferredCameraBox" Text="0" />
                     <TextBox x:Name="PreferredModeBox" Text="0" />
                   </StackPanel>
-                  <TextBlock Text="支持标准 UVC USB 相机及系统 DirectShow / MediaFoundation / V4L2 设备" Classes="muted" FontSize="11" />
+                  <TextBlock Text="支持标准 UVC USB 相机及系统 DirectShow / MediaFoundation / V4L2 设备" Classes="settings-note" />
                 </StackPanel>
               </Border>
 
@@ -97,24 +167,25 @@
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                       <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                               BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                        <Path Data="{StaticResource GeoSliders}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.4" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Path Data="{StaticResource GeoSliders}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                       </Border>
-                      <TextBlock Text="会话取景与画面预览" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="会话取景与画面预览" Classes="settings-section-title" />
                     </StackPanel>
                     <ToggleSwitch Grid.Column="1" x:Name="ChkPreviewEnabled" IsChecked="True" ToolTip.Tip="开启或关闭连续扫描时的画面预览" />
                   </Grid>
-                  <TextBlock Text="控制连续扫描时的 UI 预览帧率与最大画布限制，关闭预览可最大化降低渲染开销" Classes="muted" />
+                  <TextBlock Text="控制连续扫描时的 UI 预览帧率与最大画布限制，关闭预览可最大化降低渲染开销" Classes="settings-description" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="12" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="取景帧率上限 (FPS)" />
-                    <TextBox x:Name="PreviewFpsBox" Grid.Column="1" Text="15" Height="30" />
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="最大 W × H (0=不限制)" />
+                    <TextBlock Classes="settings-label" Text="取景帧率上限 (FPS)" />
+                    <TextBox x:Name="PreviewFpsBox" Classes="settings-input" Grid.Column="1" Text="15" Width="140" HorizontalAlignment="Left" />
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="最大 W × H" />
                     <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                      <TextBox x:Name="PreviewMaxWBox" Width="70" Text="0" Height="30" />
+                      <TextBox x:Name="PreviewMaxWBox" Classes="settings-input" Width="76" Text="0" />
                       <TextBlock Text="×" VerticalAlignment="Center" Classes="muted" />
-                      <TextBox x:Name="PreviewMaxHBox" Width="70" Text="0" Height="30" />
+                      <TextBox x:Name="PreviewMaxHBox" Classes="settings-input" Width="76" Text="0" />
+                      <TextBlock Text="0 = 跟随原始尺寸" Classes="settings-note" Margin="4,0,0,0" />
                     </StackPanel>
                   </Grid>
-                  <TextBlock Text="MJPEG 流采用 libjpeg-turbo 硬件解压，支持灰度与 BGR24 直接注入 OCR 算法" Classes="muted" FontSize="11" />
+                  <TextBlock Text="MJPEG 流采用 libjpeg-turbo 硬件解压；预览会按显示区域缩小，OCR 仍使用原图。" Classes="settings-note" />
                 </StackPanel>
               </Border>
 
@@ -133,41 +204,41 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoBrandLogo}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoBrain}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="OCR 引擎与识别模型" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="OCR 引擎与识别模型" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="基于 Sdcb.SimdPaddleOCR 纯进程内识别，无需外部 IPC 进程" Classes="muted" />
+                  <TextBlock Text="基于 Sdcb.SimdPaddleOCR 纯进程内识别，无需外部 IPC 进程" Classes="settings-description" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="模型版本" />
-                    <ComboBox x:Name="ModelCombo" Grid.Column="1" Width="220" SelectedIndex="0" Height="30">
+                    <TextBlock Classes="settings-label" Text="模型版本" />
+                    <ComboBox x:Name="ModelCombo" Classes="settings-input" Grid.Column="1" MaxWidth="360" SelectedIndex="0">
                       <ComboBoxItem Content="V6 Tiny（轻量，默认）" Tag="tiny" />
                       <ComboBoxItem Content="V6 Small（更大模型，建议实测）" Tag="small" />
                     </ComboBox>
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="检测长边" />
-                    <ComboBox x:Name="CmbOcrDetSide" Grid.Row="1" Grid.Column="1" Width="220" SelectedIndex="0" Height="30">
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="检测长边" />
+                    <ComboBox x:Name="CmbOcrDetSide" Classes="settings-input" Grid.Row="1" Grid.Column="1" MaxWidth="360" SelectedIndex="0">
                       <ComboBoxItem Content="640（较快，默认）" Tag="640" />
                       <ComboBoxItem Content="960（较准，较大画幅）" Tag="960" />
                     </ComboBox>
 
-                    <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="版式布局" />
-                    <ComboBox x:Name="CmbOcrLayout" Grid.Row="2" Grid.Column="1" Width="220" SelectedIndex="0" Height="30">
+                    <TextBlock Grid.Row="2" Classes="settings-label" Text="版式布局" />
+                    <ComboBox x:Name="CmbOcrLayout" Classes="settings-input" Grid.Row="2" Grid.Column="1" MaxWidth="360" SelectedIndex="0">
                       <ComboBoxItem Content="文本块 (多行区域)" Tag="TextBlock" />
                       <ComboBoxItem Content="单行（单据单行字符）" Tag="SingleLine" />
                     </ComboBox>
                   </Grid>
 
-                  <Border Background="{DynamicResource SurfaceSubtleBackgroundBrush}" CornerRadius="6" Padding="10,6" Margin="0,2,0,0">
+                  <Border Classes="settings-subsection" Margin="0,2,0,0">
                     <Grid ColumnDefinitions="*,Auto">
                       <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="文本方向自动纠正" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="针对 0° / 180° 倒转文字执行方向分类与纠偏" Classes="muted" FontSize="11" />
+                        <TextBlock Text="文本方向自动纠正" Classes="settings-section-title" />
+                        <TextBlock Text="针对 0° / 180° 倒转文字执行方向分类与纠偏" Classes="settings-note" />
                       </StackPanel>
                       <ToggleSwitch Grid.Column="1" x:Name="ChkOcrDirection" IsChecked="True" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
-                  <TextBlock Text="Tiny 模型针对低延迟连续扫字优化；Small 模型字符准确率更高" Classes="muted" FontSize="11" />
+                  <TextBlock Text="Tiny 模型针对低延迟连续扫字优化；Small 模型字符准确率更高。" Classes="settings-note" />
                 </StackPanel>
               </Border>
 
@@ -177,19 +248,19 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoSliders}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.4" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoSliders}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="识别性能与过滤阈值" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="识别性能与过滤阈值" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="单帧图像识别最大耗时限制与置信度过滤阈值" Classes="muted" />
+                  <TextBlock Text="单帧图像识别最大耗时限制与置信度过滤阈值" Classes="settings-description" />
                   <Grid ColumnDefinitions="140,100,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="最低置信度 %" />
-                    <TextBox x:Name="TxtOcrMinConfidence" Grid.Column="1" Text="90" Height="30" />
-                    <TextBlock Grid.Column="2" Classes="muted" Text="0–100%，低于该阈值的识别文本行将被丢弃过滤" VerticalAlignment="Center" FontSize="11" />
+                    <TextBlock Classes="settings-label" Text="最低置信度" />
+                    <TextBox x:Name="TxtOcrMinConfidence" Classes="settings-input" Grid.Column="1" Text="90" Width="100" HorizontalAlignment="Left" />
+                    <TextBlock Grid.Column="2" Classes="settings-note" Text="0–100%，低于该阈值的识别文本行将被丢弃过滤" />
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="OCR 超时时间 (ms)" />
-                    <TextBox x:Name="OcrTimeoutBox" Grid.Row="1" Grid.Column="1" Text="5000" Height="30" />
-                    <TextBlock Grid.Row="1" Grid.Column="2" Classes="muted" Text="范围 500–30000 ms，超时自动熔断丢弃" VerticalAlignment="Center" FontSize="11" />
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="OCR 超时时间 (ms)" />
+                    <TextBox x:Name="OcrTimeoutBox" Classes="settings-input" Grid.Row="1" Grid.Column="1" Text="5000" Width="100" HorizontalAlignment="Left" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Classes="settings-note" Text="范围 500–30000 ms，超时自动熔断丢弃" />
                   </Grid>
                 </StackPanel>
               </Border>
@@ -210,37 +281,39 @@
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                       <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                               BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                        <Path Data="{StaticResource GeoCornerTL}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Path Data="{StaticResource GeoCornerTL}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                       </Border>
-                      <TextBlock Text="ROI 区域裁剪" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                      <TextBlock Text="ROI 区域裁剪" Classes="settings-section-title" />
                     </StackPanel>
                     <ToggleSwitch Grid.Column="1" x:Name="ChkEnableRoi" ToolTip.Tip="启用或停用 ROI 区域裁剪"
                                   IsCheckedChanged="OnRoiEnabledChanged" />
                   </Grid>
-                  <TextBlock Text="限制 OCR 识别算法在画面的特定区域运行，大幅减少算力消耗并提高识别速度" Classes="muted" />
+                  <TextBlock Text="限制 OCR 识别算法在画面的特定区域运行，大幅减少算力消耗并提高识别速度" Classes="settings-description" />
 
-                  <Grid x:Name="RoiFieldsPanel" ColumnDefinitions="Auto,*,Auto,*,Auto,*,Auto,*,Auto" ColumnSpacing="8" RowSpacing="6" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="X%" />
-                    <TextBox x:Name="RoiXBox" Grid.Column="1" Text="10" Height="30" />
-                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="Y%" />
-                    <TextBox x:Name="RoiYBox" Grid.Column="3" Text="10" Height="30" />
-                    <TextBlock Grid.Column="4" VerticalAlignment="Center" Classes="muted" Text="W%" />
-                    <TextBox x:Name="RoiWBox" Grid.Column="5" Text="80" Height="30" />
-                    <TextBlock Grid.Column="6" VerticalAlignment="Center" Classes="muted" Text="H%" />
-                    <TextBox x:Name="RoiHBox" Grid.Column="7" Text="80" Height="30" />
-                    <Button Grid.Column="8" Classes="outline" Content="全画面" Height="30" Click="OnResetRoiToFull" ToolTip.Tip="重置为 0, 0, 100, 100" />
+                  <Grid x:Name="RoiFieldsPanel" ColumnDefinitions="Auto,100,Auto,100,*" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="8" Margin="0,4,0,0">
+                    <TextBlock Classes="settings-label" Text="X 起点 (%)" />
+                    <TextBox x:Name="RoiXBox" Classes="settings-input" Grid.Column="1" Text="10" />
+                    <TextBlock Grid.Column="2" Classes="settings-label" Text="Y 起点 (%)" Margin="8,0,0,0" />
+                    <TextBox x:Name="RoiYBox" Classes="settings-input" Grid.Column="3" Text="10" />
+                    <Button Grid.Column="4" Grid.RowSpan="2" Classes="outline settings-compact" Content="恢复全画面" Width="100" HorizontalAlignment="Right" Margin="8,0,0,0"
+                            Click="OnResetRoiToFull" ToolTip.Tip="重置为 0, 0, 100, 100" />
+
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="宽度 (%)" />
+                    <TextBox x:Name="RoiWBox" Classes="settings-input" Grid.Row="1" Grid.Column="1" Text="80" />
+                    <TextBlock Grid.Row="1" Grid.Column="2" Classes="settings-label" Text="高度 (%)" Margin="8,0,0,0" />
+                    <TextBox x:Name="RoiHBox" Classes="settings-input" Grid.Row="1" Grid.Column="3" Text="80" />
                   </Grid>
 
-                  <Border Background="{DynamicResource SurfaceSubtleBackgroundBrush}" CornerRadius="6" Padding="10,6" Margin="0,2,0,0">
+                  <Border Classes="settings-subsection" Margin="0,2,0,0">
                     <Grid ColumnDefinitions="*,Auto">
                       <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="取景中心十字标尺线" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                        <TextBlock Text="在画面中央绘制准星与对齐引导线" Classes="muted" FontSize="11" />
+                        <TextBlock Text="取景中心十字标尺线" Classes="settings-section-title" />
+                        <TextBlock Text="在画面中央绘制准星与对齐引导线" Classes="settings-note" />
                       </StackPanel>
                       <ToggleSwitch Grid.Column="1" x:Name="ChkShowGuides" IsChecked="True" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
-                  <TextBlock Text="提示：在主工作台视口右下角点击【编辑 ROI】亦可直接在画面上拖拽框选" Classes="muted" FontSize="11" />
+                  <TextBlock Text="提示：在主工作台视口右下角点击【编辑 ROI】亦可直接在画面上拖拽框选" Classes="settings-note" />
                 </StackPanel>
               </Border>
 
@@ -250,20 +323,20 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoChip}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoChip}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="去重策略与冷却时间" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="去重策略与冷却时间" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="控制连续扫描中相同文本结果的过滤机制，避免重复录入" Classes="muted" />
+                  <TextBlock Text="控制连续扫描中相同文本结果的过滤机制，避免重复录入" Classes="settings-description" />
                   <StackPanel Spacing="8" Margin="0,4,0,4">
                     <RadioButton x:Name="RbDedupeSession" Content="会话去重 (Session) — 扫描会话内同一文本仅接纳并输出一次" GroupName="Dedupe" IsChecked="True" IsCheckedChanged="OnDedupeStrategyChanged" />
                     <RadioButton x:Name="RbDedupeCooldown" Content="冷却去重 (Cooldown) — 指定时间内不再输出相同文本" GroupName="Dedupe" IsCheckedChanged="OnDedupeStrategyChanged" />
                     <RadioButton x:Name="RbDedupeUntilAbsent" Content="离场去重 (UntilAbsent) — 目标文本离开视野后再进入才重新接纳" GroupName="Dedupe" IsCheckedChanged="OnDedupeStrategyChanged" />
                     <RadioButton x:Name="RbDedupeIntraFrame" Content="帧内去重 (IntraFrame) — 仅过滤同一帧内的重复条目" GroupName="Dedupe" IsCheckedChanged="OnDedupeStrategyChanged" />
                   </StackPanel>
-                  <Grid x:Name="DedupeIntervalRow" ColumnDefinitions="140,*,140,*" RowDefinitions="Auto" ColumnSpacing="12" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="冷却间隔 (ms)" />
-                    <TextBox x:Name="DedupeIntervalBox" Grid.Column="1" Width="140" Text="1500" Height="30" />
+                  <Grid x:Name="DedupeIntervalRow" ColumnDefinitions="140,*" RowDefinitions="Auto" ColumnSpacing="12" Margin="0,4,0,0">
+                    <TextBlock Classes="settings-label" Text="冷却间隔 (ms)" />
+                    <TextBox x:Name="DedupeIntervalBox" Classes="settings-input" Grid.Column="1" Width="140" Text="1500" />
                   </Grid>
                 </StackPanel>
               </Border>
@@ -283,17 +356,17 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoSend}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoSend}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="输出通道（全局单选）" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="输出通道（全局单选）" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="选择识别结果的发送目标，支持自动写入 SQLite 持久化队列保证不丢数据" Classes="muted" />
-                  <StackPanel Orientation="Horizontal" Spacing="18" Margin="0,4,0,0">
+                  <TextBlock Text="选择识别结果的发送目标，支持自动写入 SQLite 持久化队列保证不丢数据" Classes="settings-description" />
+                  <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
                     <RadioButton x:Name="RbOutNone" Content="关闭输出" GroupName="Out" IsChecked="True" IsCheckedChanged="OnOutputRouteChanged" />
-                    <RadioButton x:Name="RbOutKeyboard" Content="键盘模拟" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
-                    <RadioButton x:Name="RbOutMqtt" Content="MQTT 客户端" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
-                    <RadioButton x:Name="RbOutTcp" Content="TCP 客户端" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
-                  </StackPanel>
+                    <RadioButton x:Name="RbOutKeyboard" Grid.Column="1" Content="键盘模拟" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
+                    <RadioButton x:Name="RbOutMqtt" Grid.Row="1" Content="MQTT 客户端" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
+                    <RadioButton x:Name="RbOutTcp" Grid.Row="1" Grid.Column="1" Content="TCP 客户端" GroupName="Out" IsCheckedChanged="OnOutputRouteChanged" />
+                  </Grid>
                 </StackPanel>
               </Border>
 
@@ -303,33 +376,33 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoTerminal}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoTerminal}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="键盘模拟配置" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="键盘模拟配置" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="将 OCR 识别结果自动键入指定的前台软件或文本编辑窗口" Classes="muted" />
+                  <TextBlock Text="将 OCR 识别结果自动键入指定的前台软件或文本编辑窗口" Classes="settings-description" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="目标进程名称" />
-                    <TextBox x:Name="KeyboardTargetBox" Grid.Column="1" Text="notepad.exe" Height="30" />
+                    <TextBlock Classes="settings-label" Text="目标进程名称" />
+                    <TextBox x:Name="KeyboardTargetBox" Classes="settings-input" Grid.Column="1" Text="notepad.exe" />
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="结束按键" />
-                    <ComboBox x:Name="KeyboardSuffixCombo" Grid.Row="1" Grid.Column="1" Height="30">
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="结束按键" />
+                    <ComboBox x:Name="KeyboardSuffixCombo" Classes="settings-input" Grid.Row="1" Grid.Column="1">
                       <ComboBoxItem Content="Enter 回车" Tag="Enter" />
                       <ComboBoxItem Content="Tab 制表符" Tag="Tab" />
                       <ComboBoxItem Content="无结束符" Tag="None" />
                     </ComboBox>
 
-                    <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="同帧多行发送方式" />
-                    <ComboBox x:Name="KeyboardSendModeCombo" Grid.Row="2" Grid.Column="1" Height="30">
+                    <TextBlock Grid.Row="2" Classes="settings-label" Text="同帧多行发送方式" />
+                    <ComboBox x:Name="KeyboardSendModeCombo" Classes="settings-input" Grid.Row="2" Grid.Column="1">
                       <ComboBoxItem Content="合并发送（多行拼接为一个字符串）" Tag="Combined" />
                       <ComboBoxItem Content="独立发送（逐行分别敲击结束键）" Tag="Individual" />
                     </ComboBox>
 
-                    <TextBlock Grid.Row="3" VerticalAlignment="Center" Classes="muted" Text="合并分隔符" />
-                    <TextBox x:Name="KeyboardSeparatorBox" Grid.Row="3" Grid.Column="1" Text=" | " Height="30" />
+                    <TextBlock Grid.Row="3" Classes="settings-label" Text="合并分隔符" />
+                    <TextBox x:Name="KeyboardSeparatorBox" Classes="settings-input" Grid.Row="3" Grid.Column="1" Text=" | " />
 
-                    <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="muted" Text="目标未就绪行为" />
-                    <ComboBox x:Name="KeyboardTargetActionCombo" Grid.Row="4" Grid.Column="1" Height="30">
+                    <TextBlock Grid.Row="4" Classes="settings-label" Text="目标未就绪行为" />
+                    <ComboBox x:Name="KeyboardTargetActionCombo" Classes="settings-input" Grid.Row="4" Grid.Column="1">
                       <ComboBoxItem Content="保持在队列中，等待前台就绪" Tag="KeepInQueue" />
                       <ComboBoxItem Content="直接丢弃本次输入" Tag="Discard" />
                     </ComboBox>
@@ -343,42 +416,42 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoChip}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoMqtt}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="MQTT 客户端配置" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="MQTT 客户端配置" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="向 MQTT 消息代理服务器推送 OCR 识别结果 JSON 载荷" Classes="muted" />
+                  <TextBlock Text="向 MQTT 消息代理服务器推送 OCR 识别结果 JSON 载荷" Classes="settings-description" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="Broker 地址与端口" />
+                    <TextBlock Classes="settings-label" Text="Broker 地址与端口" />
                     <Grid Grid.Column="1" ColumnDefinitions="*,Auto,80" ColumnSpacing="8">
-                      <TextBox x:Name="MqttBrokerBox" Text="localhost" Height="30" />
-                      <TextBlock Grid.Column="1" Text=":" VerticalAlignment="Center" Classes="muted" />
-                      <TextBox x:Name="MqttPortBox" Grid.Column="2" Text="1883" Height="30" />
+                      <TextBox x:Name="MqttBrokerBox" Classes="settings-input" Text="localhost" />
+                      <TextBlock Grid.Column="1" Text=":" Classes="settings-label" />
+                      <TextBox x:Name="MqttPortBox" Classes="settings-input" Grid.Column="2" Text="1883" />
                     </Grid>
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="发布主题 (Topic)" />
-                    <TextBox x:Name="MqttTopicBox" Grid.Row="1" Grid.Column="1" Text="scanflow-ocr/scans" Height="30" />
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="发布主题 (Topic)" />
+                    <TextBox x:Name="MqttTopicBox" Classes="settings-input" Grid.Row="1" Grid.Column="1" Text="scanflow-ocr/scans" />
 
-                    <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="客户端 ID / QoS" />
+                    <TextBlock Grid.Row="2" Classes="settings-label" Text="客户端 ID / QoS" />
                     <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,140" ColumnSpacing="8">
-                      <TextBox x:Name="MqttClientIdBox" Height="30" />
-                      <ComboBox x:Name="MqttQosCombo" Grid.Column="1" HorizontalAlignment="Stretch" Height="30">
+                      <TextBox x:Name="MqttClientIdBox" Classes="settings-input" />
+                      <ComboBox x:Name="MqttQosCombo" Classes="settings-input" Grid.Column="1" HorizontalAlignment="Stretch">
                         <ComboBoxItem Content="QoS 0 · 至多一次" Tag="0" />
                         <ComboBoxItem Content="QoS 1 · 至少一次" Tag="1" />
                         <ComboBoxItem Content="QoS 2 · 恰好一次" Tag="2" />
                       </ComboBox>
                     </Grid>
 
-                    <TextBlock Grid.Row="3" VerticalAlignment="Center" Classes="muted" Text="认证用户名" />
-                    <TextBox x:Name="MqttUsernameBox" Grid.Row="3" Grid.Column="1" Height="30" />
+                    <TextBlock Grid.Row="3" Classes="settings-label" Text="认证用户名" />
+                    <TextBox x:Name="MqttUsernameBox" Classes="settings-input" Grid.Row="3" Grid.Column="1" />
 
-                    <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="muted" Text="认证密码" />
+                    <TextBlock Grid.Row="4" Classes="settings-label" Text="认证密码" />
                     <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6">
-                      <TextBox x:Name="MqttPasswordBox" PasswordChar="●" PlaceholderText="留空则保持原密码" Height="30" />
+                      <TextBox x:Name="MqttPasswordBox" Classes="settings-input" PasswordChar="●" PlaceholderText="留空则保持原密码" />
                       <CheckBox x:Name="ClearMqttPasswordBox" Content="清除已保存密码" VerticalAlignment="Center" />
                     </StackPanel>
 
-                    <TextBlock Grid.Row="5" VerticalAlignment="Center" Classes="muted" Text="安全连接 (TLS)" />
+                    <TextBlock Grid.Row="5" Classes="settings-label" Text="安全连接 (TLS)" />
                     <ToggleSwitch x:Name="MqttTlsBox" Grid.Row="5" Grid.Column="1" ToolTip.Tip="启用 TLS / SSL 加密通道" />
                   </Grid>
                 </StackPanel>
@@ -390,20 +463,20 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoPulseLive}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoTcp}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="TCP 客户端配置" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="TCP 客户端配置" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="建立裸 TCP 套接字连接并实时流式推送换行分隔的结果数据" Classes="muted" />
+                  <TextBlock Text="建立裸 TCP 套接字连接并实时流式推送换行分隔的结果数据" Classes="settings-description" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="主机地址与端口" />
+                    <TextBlock Classes="settings-label" Text="主机地址与端口" />
                     <Grid Grid.Column="1" ColumnDefinitions="*,Auto,80" ColumnSpacing="8">
-                      <TextBox x:Name="TcpHostBox" Text="127.0.0.1" Height="30" />
-                      <TextBlock Grid.Column="1" Text=":" VerticalAlignment="Center" Classes="muted" />
-                      <TextBox x:Name="TcpPortBox" Grid.Column="2" Text="9100" Height="30" />
+                      <TextBox x:Name="TcpHostBox" Classes="settings-input" Text="127.0.0.1" />
+                      <TextBlock Grid.Column="1" Text=":" Classes="settings-label" />
+                      <TextBox x:Name="TcpPortBox" Classes="settings-input" Grid.Column="2" Text="9100" />
                     </Grid>
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="安全连接 (TLS)" />
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="安全连接 (TLS)" />
                     <ToggleSwitch x:Name="TcpTlsBox" Grid.Row="1" Grid.Column="1" ToolTip.Tip="启用 TLS 加密连接" />
                   </Grid>
                 </StackPanel>
@@ -415,22 +488,22 @@
                   <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Border Width="22" Height="22" CornerRadius="4" Background="{DynamicResource BrandSoftBrush}"
                             BorderBrush="{DynamicResource BrandBorderBrush}" BorderThickness="1">
-                      <Path Data="{StaticResource GeoDatabase}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <Path Data="{StaticResource GeoDatabase}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
-                    <TextBlock Text="SQLite 持久化输出队列" FontWeight="SemiBold" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="SQLite 持久化输出队列" Classes="settings-section-title" />
                   </StackPanel>
-                  <TextBlock Text="本地事务队列缓冲机制，防止因网络闪断导致识别数据丢失" Classes="muted" />
+                  <TextBlock Text="本地事务队列缓冲机制，防止因网络闪断导致识别数据丢失" Classes="settings-description" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
-                    <TextBlock VerticalAlignment="Center" Classes="muted" Text="队列最大容量" />
-                    <TextBox x:Name="QueueCapacityBox" Grid.Column="1" Width="140" Text="1000" Height="30" />
+                    <TextBlock Classes="settings-label" Text="队列最大容量" />
+                    <TextBox x:Name="QueueCapacityBox" Classes="settings-input" Grid.Column="1" Width="140" Text="1000" />
 
-                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="队列状态" />
-                    <TextBlock x:Name="OutputQueueStatusText" Grid.Row="1" Grid.Column="1" Classes="muted" TextWrapping="Wrap" />
+                    <TextBlock Grid.Row="1" Classes="settings-label" Text="队列状态" />
+                    <TextBlock x:Name="OutputQueueStatusText" Grid.Row="1" Grid.Column="1" Classes="settings-note" />
 
                     <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                      <Button Classes="outline" Content="刷新状态" Click="OnRefreshOutputStatus" />
-                      <Button x:Name="RetryUncertainButton" Classes="outline" Content="重试待核对…" Click="OnRetryUncertain" />
-                      <Button x:Name="ResendCompletedButton" Classes="outline" Content="重发已完成…" Click="OnResendCompleted" />
+                      <Button Classes="outline settings-compact" Content="刷新状态" Click="OnRefreshOutputStatus" />
+                      <Button x:Name="RetryUncertainButton" Classes="outline settings-compact" Content="重试待核对" Click="OnRetryUncertain" />
+                      <Button x:Name="ResendCompletedButton" Classes="outline settings-compact" Content="重发已完成" Click="OnResendCompleted" />
                     </StackPanel>
                   </Grid>
                 </StackPanel>
@@ -450,14 +523,14 @@
               CornerRadius="4" Padding="10,6" IsVisible="False">
         <TextBlock x:Name="TxtError" Foreground="{DynamicResource DangerTextBrush}" TextWrapping="Wrap" FontWeight="SemiBold" FontSize="12" />
       </Border>
-      <TextBlock x:Name="TxtPath" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
+      <TextBlock x:Name="TxtPath" Classes="settings-note" TextTrimming="CharacterEllipsis" />
     </StackPanel>
 
     <!-- 4: Actions Footer -->
     <Border Grid.Row="4" Background="{DynamicResource SurfaceBackgroundBrush}"
             BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0" Padding="16,10">
-      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
-        <TextBlock Classes="muted" Text="修改草稿将在点击应用后生效" FontSize="11" VerticalAlignment="Center" />
+      <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center" ColumnSpacing="8">
+        <TextBlock Classes="settings-note" Text="修改草稿将在点击应用后生效" />
         <Button Grid.Column="1" Classes="outline" Content="取消" Click="OnCancel" Width="88" Height="34" Margin="0,0,8,0" />
         <Button Grid.Column="2" Classes="primary" Content="应用并保存" Click="OnSave" Width="110" Height="34" />
       </Grid>

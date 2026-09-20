@@ -42,6 +42,28 @@ using (var lease = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 409
     Check(allocator.LiveBytes == 4096, "live bytes with retain");
 }
 Check(allocator.LiveBytes == 0, "live bytes after dispose");
+Check(allocator.CommittedBytes == 4096 && allocator.IdleBytes == 4096,
+    "allocator tracks idle committed bytes");
+{
+    using var reused = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 4096, ImageTransform.Identity);
+    Check(allocator.LiveBytes == 4096 && allocator.CommittedBytes == 4096,
+        "allocator reuses an exact-size native block");
+}
+allocator.TrimExcess();
+Check(allocator.CommittedBytes == 0 && allocator.IdleBytes == 0,
+    "allocator trims idle native blocks");
+{
+    using var bounded = new ImageAllocator(4096);
+    using (var held = bounded.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 4096, ImageTransform.Identity)) { }
+    bool rejectedWhileIdle = false;
+    try
+    {
+        using var oversized = bounded.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 1, ImageTransform.Identity);
+    }
+    catch (InvalidOperationException) { rejectedWhileIdle = true; }
+    Check(rejectedWhileIdle, "allocator limit includes idle blocks");
+    bounded.Dispose();
+}
 {
     var original = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 4096, ImageTransform.Identity);
     original.WritableBuffer.Span.Fill(123);
@@ -194,10 +216,40 @@ Check(typeof(ScanFlowOcr.Runtime.ScanSession).IsClass, "ScanSession type present
         Check(recognized, "JPEG camera frame reaches OCR as BGR24 without ROI");
         await session.StopAsync(CancellationToken.None);
 
+        var roiProfile = profile with
+        {
+            Ocr = profile.Ocr! with { Region = new Rect2(2, 3, 4, 2) }
+        };
+        var jpegRoiFactory = new ProbeOcrFactory();
+        await using var jpegRoiSession = new ScanFlowOcr.Runtime.ScanSession(
+            new ProbeCameraProvider(cameraId, mode, jpeg), jpegRoiFactory, nativeJpeg, roiProfile);
+        await jpegRoiSession.StartAsync(CancellationToken.None);
+        using var jpegRoiDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        bool jpegRoiRecognized = false;
+        await foreach (var evt in jpegRoiSession.ReadEventsAsync(jpegRoiDeadline.Token))
+        {
+            if (evt is ScanRecordReady { Record.TextLines.Length: > 0 })
+            {
+                jpegRoiRecognized = true;
+                break;
+            }
+            if (evt is StateChanged { State: SessionState.Faulted } fault)
+                throw new InvalidOperationException("JPEG ROI session fault: " + fault.Reason);
+        }
+        Check(jpegRoiRecognized, "JPEG camera ROI reaches OCR");
+        var jpegRoiInput = jpegRoiFactory.LastInput ?? throw new InvalidOperationException("JPEG ROI OCR input missing");
+        Check(jpegRoiInput.Layout.Width == 4 && jpegRoiInput.Layout.Height == 2,
+            "JPEG OCR receives ROI dimensions");
+        Check(jpegRoiInput.Layout.Planes[0].Offset == 78 && jpegRoiInput.Layout.Planes[0].StrideBytes == 24 &&
+              jpegRoiInput.ImageToSource.M13 == 2 && jpegRoiInput.ImageToSource.M23 == 3,
+            "JPEG OCR receives ROI view offset and source mapping");
+        await jpegRoiSession.StopAsync(CancellationToken.None);
+
         var rawMode = mode with { Encoding = FrameEncoding.Raw, PixelFormat = PixelFormat.Bgra32 };
+        var rawRoiFactory = new ProbeOcrFactory();
         await using var rawSession = new ScanFlowOcr.Runtime.ScanSession(
             new ProbeCameraProvider(cameraId, rawMode, new byte[8 * 8 * 4]),
-            new ProbeOcrFactory(), nativeJpeg, profile);
+            rawRoiFactory, nativeJpeg, roiProfile);
         await rawSession.StartAsync(CancellationToken.None);
         using var rawDeadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         bool rawRecognized = false;
@@ -211,7 +263,13 @@ Check(typeof(ScanFlowOcr.Runtime.ScanSession).IsClass, "ScanSession type present
             if (evt is StateChanged { State: SessionState.Faulted } fault)
                 throw new InvalidOperationException("Raw session fault: " + fault.Reason);
         }
-        Check(rawRecognized, "BGRA image frame reaches OCR as BGR24 without ROI");
+        Check(rawRecognized, "BGRA image frame reaches OCR as BGR24 with ROI");
+        var rawRoiInput = rawRoiFactory.LastInput ?? throw new InvalidOperationException("BGRA ROI OCR input missing");
+        Check(rawRoiInput.Layout.Width == 4 && rawRoiInput.Layout.Height == 2 &&
+              rawRoiInput.Layout.Planes[0].Offset == 0 && rawRoiInput.Layout.Planes[0].StrideBytes == 12,
+            "BGRA OCR receives packed ROI dimensions");
+        Check(rawRoiInput.ImageToSource.M13 == 2 && rawRoiInput.ImageToSource.M23 == 3,
+            "BGRA OCR ROI preserves source mapping");
         await rawSession.StopAsync(CancellationToken.None);
     }
 }
@@ -285,16 +343,18 @@ file sealed class ProbeCameraSession(CameraId id, CaptureMode mode, byte[] pixel
 
 file sealed class ProbeOcrFactory : IOcrReaderFactory
 {
+    public ImageInput? LastInput { get; set; }
     public string ProviderId => "probe";
     public ValueTask<IOcrReader> CreateAsync(OcrSettings settings, CancellationToken token) =>
-        ValueTask.FromResult<IOcrReader>(new ProbeOcrReader());
+        ValueTask.FromResult<IOcrReader>(new ProbeOcrReader(this));
 }
 
-file sealed class ProbeOcrReader : IOcrReader
+file sealed class ProbeOcrReader(ProbeOcrFactory owner) : IOcrReader
 {
     public EngineDescriptor Descriptor => new("probe", "1", [PixelFormat.Bgr24], true, false, false, 1);
     public ValueTask<EngineBatch<OcrLine>> ReadAsync(ImageInput input, RecognitionRequest request, CancellationToken token)
     {
+        owner.LastInput = input;
         RawImages.ValidateBgr(input);
         return ValueTask.FromResult(new EngineBatch<OcrLine>(request.Analysis, StageStatus.Completed,
             [new OcrLine("probe", new Quad(new(0, 0), new(8, 0), new(8, 8), new(0, 8)), 1, null, [])],

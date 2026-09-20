@@ -24,7 +24,7 @@
           <!-- Header Left: Brand Logo & Title -->
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="14,0,0,0">
             <Border Background="{DynamicResource BrandBrush}" CornerRadius="4" Width="22" Height="22">
-              <Path Data="{StaticResource GeoBrandLogo}" Fill="#ffffff" Width="13" Height="13" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Path Data="{StaticResource GeoBrandLogo}" Classes="icon-stroke" Stroke="#ffffff" StrokeThickness="1.5" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <TextBlock Text="ScanFlow-OCR" FontWeight="SemiBold" FontSize="15" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" />
             <Border Classes="chip" VerticalAlignment="Center">
@@ -46,12 +46,12 @@
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
             <Button x:Name="ThemeToggleButton" Classes="ghost" Width="32" Height="28" Padding="0" Margin="0,0,4,0"
                     VerticalAlignment="Center" ToolTip.Tip="切换浅色 / 深色主题" Click="OnToggleTheme">
-              <Path x:Name="PathThemeIcon" Data="{StaticResource GeoSun}" Fill="{DynamicResource WarningBrush}" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Path x:Name="PathThemeIcon" Data="{StaticResource GeoSun}" Classes="icon-stroke" Stroke="{DynamicResource WarningBrush}" Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Button>
             <Button x:Name="SettingsButton" Classes="outline" Height="28" Padding="10,3" Margin="0,0,8,0"
                     VerticalAlignment="Center" Click="OnOpenSettings">
               <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <Path Data="{StaticResource GeoGear}" Fill="{DynamicResource TextPrimaryBrush}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" />
+                <Path Data="{StaticResource GeoGear}" Classes="icon-stroke" Width="13" Height="13" VerticalAlignment="Center" />
                 <TextBlock Text="设置" FontSize="12" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
@@ -62,7 +62,8 @@
             <Grid x:Name="PanelCaptionButtons" Width="138" Height="42" ColumnDefinitions="46,46,46"
                   VerticalAlignment="Center" ClipToBounds="True">
               <Button x:Name="BtnMinimizeWindow" Grid.Column="0" Classes="caption" ToolTip.Tip="最小化" Click="OnMinimizeWindowClick">
-                <Path Data="{StaticResource GeoWindowMinimize}" Width="10" Height="1" Stretch="Fill"
+                <Path Data="{StaticResource GeoWindowMinimize}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2"
+                      Width="10" Height="10" Stretch="Uniform"
                       HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button x:Name="BtnMaximizeRestoreWindow" Grid.Column="1" Classes="caption" ToolTip.Tip="最大化" Click="OnMaximizeRestoreWindowClick">
@@ -84,7 +85,7 @@
         <TextBlock x:Name="TxtBannerMessage" Foreground="{DynamicResource WarningTextBrush}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
           <Button x:Name="BtnCopyBanner" Classes="ghost" ToolTip.Tip="复制错误信息" Width="26" Height="22" Padding="0" Click="OnCopyBanner">
-            <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource WarningTextBrush}" StrokeThickness="1.2" Width="12" Height="12" Stretch="Uniform" />
+            <Path Data="{StaticResource GeoCopy}" Classes="icon-stroke" Stroke="{DynamicResource WarningTextBrush}" Width="12" Height="12" />
           </Button>
           <Button Classes="ghost" ToolTip.Tip="关闭提示" Width="24" Height="22" Padding="0" Foreground="{DynamicResource WarningTextBrush}" Click="OnDismissBanner">
             <TextBlock Text="✕" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -116,14 +117,14 @@
                       Background="{DynamicResource SurfaceHoverBackgroundBrush}"
                       BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1"
                       VerticalAlignment="Center">
-                <Path Data="{StaticResource GeoCamera}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Path Data="{StaticResource GeoCamera}" Classes="icon-stroke-brand" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Border>
               <TextBlock Text="输入源:" FontSize="12" Classes="muted" VerticalAlignment="Center" />
               <TextBlock x:Name="TxtCurrentSourceName" Text="未选择设备" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
               <Border x:Name="BadgeCurrentSourceMode" Classes="chip" VerticalAlignment="Center">
                 <TextBlock x:Name="TxtCurrentSourceMode" Text="-" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" />
               </Border>
-              <Path Data="{StaticResource GeoChevronRight}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="8" Height="8" Stretch="Uniform" VerticalAlignment="Center" />
+              <Path Data="{StaticResource GeoChevronRight}" Classes="icon-stroke-muted" Width="8" Height="8" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
 
@@ -132,9 +133,9 @@
           <!-- Import Images Button with MenuFlyout -->
           <Button Classes="outline" Height="32" Padding="10,3" Margin="0,0,8,0" ToolTip.Tip="导入本地单张/多张图片文件或文件夹">
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-              <Path Data="{StaticResource GeoImage}" Fill="{DynamicResource TextSecondaryBrush}" Width="13" Height="13" Stretch="Uniform" VerticalAlignment="Center" />
+              <Path Data="{StaticResource GeoImage}" Classes="icon-stroke" Width="13" Height="13" VerticalAlignment="Center" />
               <TextBlock Text="导入图片" FontSize="12" VerticalAlignment="Center" />
-              <Path Data="{StaticResource GeoChevronDown}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="8" Height="5" Stretch="Uniform" VerticalAlignment="Center" />
+              <Path Data="{StaticResource GeoChevronDown}" Classes="icon-stroke-muted" Width="8" Height="5" VerticalAlignment="Center" />
             </StackPanel>
             <Button.Flyout>
               <MenuFlyout Placement="Bottom">
@@ -218,8 +219,8 @@
           <Grid Grid.Row="0" x:Name="ViewportHost" Background="{DynamicResource ViewportBackgroundBrush}"
                 SizeChanged="OnViewportSizeChanged" DoubleTapped="OnViewportDoubleTap">
 
-            <!-- Transformed Content Area (centered zoom and pan; ROI owns drag while editing) -->
-            <Grid x:Name="ViewportCanvasArea" ClipToBounds="True" Background="Transparent" RenderTransformOrigin="0.5,0.5"
+            <!-- Transformed content area (mouse-anchored zoom and pan; ROI owns drag while editing) -->
+            <Grid x:Name="ViewportCanvasArea" ClipToBounds="True" Background="Transparent" RenderTransformOrigin="0,0"
                   PointerWheelChanged="OnViewportMouseWheel"
                   PointerPressed="OnViewportMouseDown"
                   PointerMoved="OnViewportMouseMove"
@@ -237,10 +238,10 @@
             <Grid x:Name="PanelPlaceholder" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="{DynamicResource ReticleCenterGlowBrush}" IsVisible="True">
               <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Width="380" Height="260">
                 <!-- Framing Corner Brackets -->
-                <Path Data="{StaticResource GeoCornerTL}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0.8" />
-                <Path Data="{StaticResource GeoCornerTR}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Top" Opacity="0.8" />
-                <Path Data="{StaticResource GeoCornerBL}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Bottom" Opacity="0.8" />
-                <Path Data="{StaticResource GeoCornerBR}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Bottom" Opacity="0.8" />
+                <Path Data="{StaticResource GeoCornerTL}" Classes="icon-stroke" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0.8" />
+                <Path Data="{StaticResource GeoCornerTR}" Classes="icon-stroke" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" HorizontalAlignment="Right" VerticalAlignment="Top" Opacity="0.8" />
+                <Path Data="{StaticResource GeoCornerBL}" Classes="icon-stroke" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" HorizontalAlignment="Left" VerticalAlignment="Bottom" Opacity="0.8" />
+                <Path Data="{StaticResource GeoCornerBR}" Classes="icon-stroke" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="2" Width="16" Height="16" HorizontalAlignment="Right" VerticalAlignment="Bottom" Opacity="0.8" />
 
                 <!-- Outer Framing Guide Box -->
                 <Border BorderBrush="{DynamicResource ReticleGridBrush}" BorderThickness="1" Margin="8" CornerRadius="4" Opacity="0.6" />
@@ -250,7 +251,7 @@
                 <Ellipse Width="120" Height="120" Stroke="{DynamicResource ReticleGridBrush}" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.8" />
 
                 <!-- Center Crosshairs -->
-                <Path Data="{StaticResource GeoReticleCrosshair}" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="1.5" Width="32" Height="32" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.85" />
+                <Path Data="{StaticResource GeoReticleCrosshair}" Classes="icon-stroke" Stroke="{DynamicResource ReticleAccentBrush}" StrokeThickness="1.5" Width="32" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.85" />
 
                 <!-- Center Status Card -->
                 <Border Background="{DynamicResource ViewportOverlayBackgroundBrush}"
@@ -314,7 +315,7 @@
                 <Button x:Name="BtnEditRoi" Classes="tool-action" Height="22" Padding="6,0"
                         ToolTip.Tip="在当前画面中框选 OCR 识别区域" Click="OnBeginRoiEdit">
                   <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                    <Path Data="{StaticResource GeoSliders}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.4" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                    <Path Data="{StaticResource GeoSliders}" Classes="icon-stroke" Width="11" Height="11" VerticalAlignment="Center" />
                     <TextBlock Text="编辑 ROI" FontSize="11" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
@@ -322,14 +323,15 @@
                 <Button x:Name="BtnToggleGuides" Classes="tool-action" Height="22" Padding="8,0"
                         ToolTip.Tip="显示 / 隐藏画面中心十字标尺线" Click="OnToggleGuides">
                   <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                    <Path Data="{StaticResource GeoReticleCrosshair}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                    <Path Data="{StaticResource GeoReticleCrosshair}" Classes="icon-stroke" Width="11" Height="11" VerticalAlignment="Center" />
                     <TextBlock Text="十字线" FontSize="11" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
                 <Border Width="1" Height="14" Background="{DynamicResource BorderSubtleBrush}" Margin="4,0" VerticalAlignment="Center" />
                 <Button Classes="tool-action tool-zoom" Width="22" Height="22" Padding="0" Content="−" Click="OnZoomOut" ToolTip.Tip="缩小画面" />
                 <Button Classes="tool-action tool-zoom-value" Height="22" Padding="6,0" Click="OnZoomReset" ToolTip.Tip="双击视口或点击还原 (1:1 / 适应窗口)">
-                  <TextBlock x:Name="TxtZoomLevel" Text="100%" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock x:Name="TxtZoomLevel" Text="100%" FontSize="11" FontWeight="SemiBold"
+                             VerticalAlignment="Center" HorizontalAlignment="Center" />
                 </Button>
                 <Button Classes="tool-action tool-zoom" Width="22" Height="22" Padding="0" Content="+" Click="OnZoomIn" ToolTip.Tip="放大画面" />
               </StackPanel>
@@ -347,18 +349,18 @@
               <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,0">
                 <Button Classes="ghost" Height="30" HorizontalAlignment="Left" Padding="4,0" Click="OnToggleDrawer">
                   <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <Path Data="{StaticResource GeoImage}" Fill="{DynamicResource BrandBrush}" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" />
+                    <Path Data="{StaticResource GeoImage}" Classes="icon-stroke-brand" Width="12" Height="12" VerticalAlignment="Center" />
                     <TextBlock Text="图像列表" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
                     <Border Classes="chip">
                       <TextBlock x:Name="TxtImageCount" Text="0 张" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
                     </Border>
-                    <Path x:Name="PathDrawerChevron" Data="{StaticResource GeoChevronDown}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="9" Height="9" Stretch="Uniform" VerticalAlignment="Center" Margin="4,0,0,0" />
+                    <Path x:Name="PathDrawerChevron" Data="{StaticResource GeoChevronDown}" Classes="icon-stroke-muted" Width="9" Height="9" VerticalAlignment="Center" Margin="4,0,0,0" />
                   </StackPanel>
                 </Button>
                 <!-- Drawer Right Actions: Clear button -->
                 <Button Grid.Column="1" Classes="danger-soft" Height="22" Padding="6,1" Click="OnClearPlaylist" ToolTip.Tip="清空已导入图片并恢复默认状态">
                   <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                    <Path Data="{StaticResource GeoTrash}" Fill="{DynamicResource DangerTextBrush}" Width="10" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                    <Path Data="{StaticResource GeoTrash}" Classes="icon-stroke-danger" Width="10" Height="10" VerticalAlignment="Center" />
                     <TextBlock Text="清空" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" VerticalAlignment="Center" />
                   </StackPanel>
                 </Button>
@@ -368,7 +370,7 @@
               <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="0,2,0,6">
                 <!-- Left Scroll Arrow -->
                 <Button Grid.Column="0" Classes="ghost" Width="26" Height="86" Padding="0" Click="OnPlaylistScrollLeft" ToolTip.Tip="向前滚动" VerticalAlignment="Center">
-                  <Path Data="{StaticResource GeoChevronLeft}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="10" Height="14" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Path Data="{StaticResource GeoChevronLeft}" Classes="icon-stroke-muted" Width="10" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
 
                 <!-- ScrollViewer with auto-hiding scrollbar -->
@@ -404,7 +406,7 @@
 
                 <!-- Right Scroll Arrow -->
                 <Button Grid.Column="2" Classes="ghost" Width="26" Height="86" Padding="0" Click="OnPlaylistScrollRight" ToolTip.Tip="向后滚动" VerticalAlignment="Center">
-                  <Path Data="{StaticResource GeoChevronRight}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="10" Height="14" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Path Data="{StaticResource GeoChevronRight}" Classes="icon-stroke-muted" Width="10" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Button>
               </Grid>
             </Grid>
@@ -435,7 +437,7 @@
 
               <Border Grid.Column="1" Classes="chip">
                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <Path Data="{StaticResource GeoChip}" Fill="{DynamicResource TextMutedBrush}" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                  <Path Data="{StaticResource GeoChip}" Classes="icon-stroke-muted" Width="11" Height="11" VerticalAlignment="Center" />
                   <TextBlock Text="TurboJPEG · BGR24 · SimdPaddle" FontSize="11"
                              FontFamily="Cascadia Code, Consolas, monospace" Classes="muted" VerticalAlignment="Center" />
                 </StackPanel>
@@ -464,7 +466,7 @@
             <Button x:Name="ClearResultsButton" Grid.Column="1" Classes="danger-soft" Height="28" Padding="8,2" Click="OnClearResults"
                     ToolTip.Tip="清空识别结果列表" IsEnabled="False">
               <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <Path Data="{StaticResource GeoTrash}" Fill="{DynamicResource DangerTextBrush}" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
+                <Path Data="{StaticResource GeoTrash}" Classes="icon-stroke-danger" Width="11" Height="11" VerticalAlignment="Center" />
                 <TextBlock Text="清空" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
@@ -475,8 +477,7 @@
             <TextBox x:Name="ResultSearchBox" PlaceholderText="搜索结果…" Height="32"
                      TextChanged="OnResultSearchChanged">
               <TextBox.InnerLeftContent>
-                <Path Data="{StaticResource GeoSearch}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Fill="Transparent"
-                      Width="13" Height="13" Stretch="Uniform" Margin="9,0,4,0" VerticalAlignment="Center" />
+                <Path Data="{StaticResource GeoSearch}" Classes="icon-stroke-muted" Width="13" Height="13" Margin="9,0,4,0" VerticalAlignment="Center" />
               </TextBox.InnerLeftContent>
             </TextBox>
           </Grid>
@@ -521,9 +522,7 @@
                           </Border>
                           <Button Grid.Column="3" Classes="ghost" Width="24" Height="24" Padding="0"
                                   ToolTip.Tip="复制此条文本" Tag="{Binding}" Click="OnCopyResultItem">
-                            <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource TextMutedBrush}"
-                                  StrokeThickness="1.2" Width="11" Height="11" Stretch="Uniform"
-                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Path Data="{StaticResource GeoCopy}" Classes="icon-stroke-muted" Width="11" Height="11" HorizontalAlignment="Center" VerticalAlignment="Center" />
                           </Button>
                         </Grid>
                       </Border>
@@ -535,9 +534,7 @@
                 <StackPanel x:Name="PanelEmptyResults" HorizontalAlignment="Center"
                             VerticalAlignment="Center" Spacing="8" IsHitTestVisible="False">
                   <Border Classes="empty-results-icon" Width="46" Height="46" HorizontalAlignment="Center">
-                    <Path Data="{StaticResource GeoSearch}" Stroke="{DynamicResource BrandBrush}"
-                          StrokeThickness="1.5" Fill="Transparent" Width="22" Height="22"
-                          Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Path Data="{StaticResource GeoSearch}" Classes="icon-stroke-brand" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center" />
                   </Border>
                   <TextBlock Text="暂无识别结果" FontSize="12" FontWeight="SemiBold"
                              HorizontalAlignment="Center" />
@@ -602,7 +599,7 @@
             <!-- Left Clickable Toggle Area: Icon + Title + Line Count Badge -->
             <Button Grid.Column="0" Classes="ghost" Height="26" HorizontalAlignment="Left" Padding="4,2" Click="OnToggleLogDrawer" ToolTip.Tip="点击展开 / 收起运行日志抽屉">
               <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                <Path Data="{StaticResource GeoTerminal}" Stroke="{DynamicResource BrandBrush}" StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform" VerticalAlignment="Center" />
+                <Path Data="{StaticResource GeoTerminal}" Classes="icon-stroke-brand" Width="12" Height="12" VerticalAlignment="Center" />
                 <TextBlock Text="运行日志" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Border Classes="chip" Padding="5,1">
                   <TextBlock x:Name="TxtLogLineCount" Text="0 行" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
@@ -614,19 +611,19 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
               <Button Classes="ghost" Height="24" Padding="6,2" Click="OnCopyLog" ToolTip.Tip="复制全部运行日志">
                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2" Width="10" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                  <Path Data="{StaticResource GeoCopy}" Classes="icon-stroke" Stroke="{DynamicResource TextSecondaryBrush}" Width="10" Height="10" VerticalAlignment="Center" />
                   <TextBlock Text="复制" FontSize="11" Classes="muted" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Button Classes="log-clear" Height="24" Padding="6,2" Click="OnClearLog" ToolTip.Tip="清空运行日志">
                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <Path Data="{StaticResource GeoTrash}" Fill="{DynamicResource DangerTextBrush}" Width="10" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
+                  <Path Data="{StaticResource GeoTrash}" Classes="icon-stroke-danger" Width="10" Height="10" VerticalAlignment="Center" />
                   <TextBlock Text="清空" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
               <Border Width="1" Height="12" Background="{DynamicResource BorderSubtleBrush}" Margin="2,0" VerticalAlignment="Center" />
               <Button Classes="ghost" Width="26" Height="24" Padding="0" Click="OnToggleLogDrawer" ToolTip.Tip="展开 / 收起抽屉">
-                <Path x:Name="PathLogDrawerChevron" Data="{StaticResource GeoChevronUp}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Width="9" Height="9" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                <Path x:Name="PathLogDrawerChevron" Data="{StaticResource GeoChevronUp}" Classes="icon-stroke-muted" Width="9" Height="9" VerticalAlignment="Center" HorizontalAlignment="Center" />
               </Button>
             </StackPanel>
           </Grid>

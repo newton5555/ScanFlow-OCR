@@ -58,6 +58,9 @@ public partial class MainWindow : Window, IAsyncDisposable
     private int _previewUpdateScheduled;
     private IOcrReader? _ocrReader;
     private string? _ocrReaderModel;
+    // Latest OCR result for the currently displayed frame. This is updated from
+    // AnalysisReady, even when dedupe rejects the frame as a retained record.
+    private ImmutableArray<OcrLine> _frameLines = [];
     private ImmutableArray<OcrLine> _lastLines = [];
     private FrameStamp? _lastStamp;
     private bool _busy;
@@ -559,6 +562,10 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
     }
 
+    private const int MaxLogCharacters = 64 * 1024;
+    private const int MaxLogLines = 2000;
+    private readonly Queue<string> _logBuffer = [];
+    private int _logBufferCharacters;
     private int _logLinesCount;
     private bool _isLogDrawerExpanded;
 
@@ -583,9 +590,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void OnClearLog(object? sender, RoutedEventArgs e)
     {
-        Log.Text = "";
-        _logLinesCount = 0;
-        TxtLogLineCount.Text = "0 行";
+        ClearLogBuffer();
         SetStatus("已清空运行日志");
     }
 
@@ -631,21 +636,34 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void OnClearResults(object? sender, RoutedEventArgs e)
     {
+        ClearScanResults();
+        ClearLogBuffer();
+        SetStatus("已清空结果");
+    }
+
+    private void ClearLogBuffer()
+    {
+        _logBuffer.Clear();
+        _logBufferCharacters = 0;
+        _logLinesCount = 0;
+        Log.Text = string.Empty;
+        TxtLogLineCount.Text = "0 行";
+    }
+
+    private void ClearScanResults()
+    {
         _allResults.Clear();
         ApplyResultFilter();
+        _frameLines = [];
         _lastLines = [];
         _lastStamp = null;
         SendOutputButton.IsEnabled = false;
         ClearResultsButton.IsEnabled = false;
         ResultsList.SelectedItem = null;
-        SyncFrameAnnotations();
         TxtInspectorText.Text = "选择一条结果查看详情";
         ClearInspectorMetadata();
         SelectedResultCopyButton.IsEnabled = false;
-        Log.Text = "";
-        _logLinesCount = 0;
-        TxtLogLineCount.Text = "0 行";
-        SetStatus("已清空结果");
+        SyncFrameAnnotations();
     }
 
     private async void OnClearDedupe(object? sender, RoutedEventArgs e)
@@ -804,6 +822,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             DrawerPlaylist.IsVisible = false;
 
         TxtImageCount.Text = "0 张";
+        _frameLines = [];
         _lastLines = [];
         SyncFrameAnnotations();
         PreviewImage.Source = null;
@@ -826,6 +845,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         _cameraProvider.SetStartIndex(item.Index);
         if (_activeSession is null && _preview is null)
         {
+            _frameLines = [];
             _lastLines = [];
             SyncFrameAnnotations();
             await ShowStillPreviewAsync(item.FilePath).ConfigureAwait(true);
@@ -1025,6 +1045,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             _stillPreviewBitmap?.Dispose();
             _stillPreviewBitmap = null;
             PanelPlaceholder.IsVisible = true;
+            _frameLines = [];
             _lastLines = [];
             SyncFrameAnnotations();
         }
@@ -1136,14 +1157,41 @@ public partial class MainWindow : Window, IAsyncDisposable
             return;
         }
 
+        // Match WPF: a new continuous session starts with no retained results or
+        // frame annotations, so an empty ROI frame cannot leave old full-frame
+        // OCR boxes visible.
+        ClearScanResults();
+
         // Persist toolbar model into settings for session profile
         _settings.SetOcrModel(GetSelectedModel());
         SessionProfile profile;
-        try { profile = _settings.ToSessionProfile(_cameras[di].Id, modes[mi]); }
+        try
+        {
+            profile = _settings.ToSessionProfile(_cameras[di].Id, modes[mi]);
+            var previewBounds = GetPreviewDecodeBounds();
+            profile = profile with
+            {
+                Preview = profile.Preview with
+                {
+                    MaxWidth = previewBounds.Width,
+                    MaxHeight = previewBounds.Height
+                }
+            };
+        }
         catch (Exception ex)
         {
             Append($"配置生成失败: {ex.Message}");
             return;
+        }
+
+        if (profile.Ocr?.Region is Rect2 roi)
+        {
+            Append(string.Create(CultureInfo.InvariantCulture,
+                $"相机 OCR ROI 已应用: X={roi.X:0} Y={roi.Y:0} W={roi.Width:0} H={roi.Height:0}px"));
+        }
+        else
+        {
+            Append("相机 OCR ROI 未启用（请检查设置中的 ROI 开关）。");
         }
 
         try { _coordinator.Configure(profile.Outputs); }
@@ -1330,6 +1378,12 @@ public partial class MainWindow : Window, IAsyncDisposable
     {
         switch (evt)
         {
+            case AnalysisReady analysisReady:
+                _frameLines = analysisReady.Analysis.Ocr.Status == StageStatus.Completed
+                    ? analysisReady.Analysis.Ocr.Items
+                    : [];
+                SyncFrameAnnotations();
+                break;
             case ScanRecordReady ready:
                 AddRecord(ready.Record);
                 break;
@@ -1364,6 +1418,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void AddRecord(ScanRecord record)
     {
+        _frameLines = record.TextLines;
         _lastLines = record.TextLines;
         _lastStamp = record.Frame;
         SendOutputButton.IsEnabled = !record.TextLines.IsDefaultOrEmpty;
@@ -1602,16 +1657,17 @@ public partial class MainWindow : Window, IAsyncDisposable
             var session = await _cameraProvider
                 .OpenAsync(new CameraOpenOptions(_cameras[di].Id, modes[mi].ModeId), CancellationToken.None)
                 .ConfigureAwait(true);
+            var previewBounds = GetPreviewDecodeBounds();
             _preview = new CameraPreviewController(
                 Append, SetCameraError,
-                bmp =>
+                (bmp, stamp) =>
                 {
                     PreviewImage.Source = bmp;
                     if (bmp is not null)
                     {
                         PanelPlaceholder.IsVisible = false;
-                        _sourceWidth = bmp.PixelSize.Width;
-                        _sourceHeight = bmp.PixelSize.Height;
+                        _sourceWidth = stamp?.SourceWidth > 0 ? stamp.Value.SourceWidth : bmp.PixelSize.Width;
+                        _sourceHeight = stamp?.SourceHeight > 0 ? stamp.Value.SourceHeight : bmp.PixelSize.Height;
                         UpdatePreviewSurfaceGeometry();
                     }
                 },
@@ -1620,7 +1676,9 @@ public partial class MainWindow : Window, IAsyncDisposable
                     StartPreviewButton.IsEnabled = _activeSession is null;
                     StopPreviewButton.IsEnabled = false;
                     OcrFrameButton.IsEnabled = false;
-                });
+                },
+                previewBounds.Width,
+                previewBounds.Height);
             try
             {
                 await _preview.StartAsync(session, CancellationToken.None).ConfigureAwait(true);
@@ -1667,28 +1725,29 @@ public partial class MainWindow : Window, IAsyncDisposable
     private async void OnOcrCurrentFrame(object? sender, RoutedEventArgs e)
     {
         if (_busy || _preview is null) return;
-        if (!_preview.TryGetLatestBgra(out byte[] bgra, out int w, out int h, out FrameStamp stamp))
+        CameraOcrFrame? latest = await _preview.DecodeLatestBgrAsync(CancellationToken.None).ConfigureAwait(true);
+        if (latest is not CameraOcrFrame frame)
         {
             Append("No decoded frame yet.");
             return;
         }
+        int w = frame.Width;
+        int h = frame.Height;
+        FrameStamp stamp = frame.Stamp;
         string model = GetSelectedModel();
         await RunExclusiveAsync(async () =>
         {
             byte[] bgr = await Task.Run(() =>
             {
-                if (_settings.EnableRoi)
-                {
-                    int x = (int)Math.Clamp(Math.Round(w * (_settings.RoiX / 100.0)), 0, Math.Max(0, w - 1));
-                    int y = (int)Math.Clamp(Math.Round(h * (_settings.RoiY / 100.0)), 0, Math.Max(0, h - 1));
-                    int rw = (int)Math.Clamp(Math.Round(w * (_settings.RoiWidth / 100.0)), 1, Math.Max(1, w - x));
-                    int rh = (int)Math.Clamp(Math.Round(h * (_settings.RoiHeight / 100.0)), 1, Math.Max(1, h - y));
-                    byte[] cropped = new byte[rw * rh * 4];
-                    for (int row = 0; row < rh; row++)
-                        Buffer.BlockCopy(bgra, ((y + row) * w + x) * 4, cropped, row * rw * 4, rw * 4);
-                    return StillImages.CopyToBgr(cropped, rw, rh);
-                }
-                return StillImages.CopyToBgr(bgra, w, h);
+                if (!_settings.EnableRoi) return frame.Bgr;
+                int x = (int)Math.Clamp(Math.Round(w * (_settings.RoiX / 100.0)), 0, Math.Max(0, w - 1));
+                int y = (int)Math.Clamp(Math.Round(h * (_settings.RoiY / 100.0)), 0, Math.Max(0, h - 1));
+                int rw = (int)Math.Clamp(Math.Round(w * (_settings.RoiWidth / 100.0)), 1, Math.Max(1, w - x));
+                int rh = (int)Math.Clamp(Math.Round(h * (_settings.RoiHeight / 100.0)), 1, Math.Max(1, h - y));
+                byte[] cropped = new byte[checked(rw * rh * 3)];
+                for (int row = 0; row < rh; row++)
+                    Buffer.BlockCopy(frame.Bgr, checked(((y + row) * w + x) * 3), cropped, row * rw * 3, rw * 3);
+                return cropped;
             }).ConfigureAwait(true);
 
             int ow = _settings.EnableRoi
@@ -2007,8 +2066,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         double delta = e.Delta.Y;
         if (Math.Abs(delta) < 0.001) return;
         double factor = delta > 0 ? 1.15 : (1.0 / 1.15);
-        Point cursorInHost = e.GetPosition(ViewportHost);
-        ZoomAtPoint(factor, cursorInHost);
+        Point cursorInViewport = e.GetPosition(ViewportCanvasArea);
+        ZoomAtPoint(factor, cursorInViewport);
     }
 
     private void OnViewportMouseDown(object? sender, PointerPressedEventArgs e)
@@ -2116,10 +2175,22 @@ public partial class MainWindow : Window, IAsyncDisposable
         _viewportScale.ScaleX = _zoomFactor;
         _viewportScale.ScaleY = _zoomFactor;
 
-        double originX = ViewportHost.Bounds.Width * 0.5;
-        double originY = ViewportHost.Bounds.Height * 0.5;
-        _viewportTranslate.X = (center.X - originX) * (1 - k) + _viewportTranslate.X * k;
-        _viewportTranslate.Y = (center.Y - originY) * (1 - k) + _viewportTranslate.Y * k;
+        // The transform origin is the viewport's top-left. Keeping the point
+        // under the cursor fixed therefore uses the same affine equation for
+        // wheel zoom and toolbar zoom, even after the user has panned.
+        _viewportTranslate.X = center.X * (1 - k) + _viewportTranslate.X * k;
+        _viewportTranslate.Y = center.Y * (1 - k) + _viewportTranslate.Y * k;
+
+        if (_preview is not null)
+        {
+            var previewBounds = GetPreviewDecodeBounds();
+            _preview.SetPreviewBounds(previewBounds.Width, previewBounds.Height);
+        }
+        if (_activeSession is not null)
+        {
+            var previewBounds = GetPreviewDecodeBounds();
+            _activeSession.SetPreviewBounds(previewBounds.Width, previewBounds.Height);
+        }
 
         UpdateZoomLevelText();
         RedrawOverlay();
@@ -2132,6 +2203,9 @@ public partial class MainWindow : Window, IAsyncDisposable
         _viewportScale.ScaleY = 1.0;
         _viewportTranslate.X = 0;
         _viewportTranslate.Y = 0;
+        var previewBounds = GetPreviewDecodeBounds();
+        _preview?.SetPreviewBounds(previewBounds.Width, previewBounds.Height);
+        _activeSession?.SetPreviewBounds(previewBounds.Width, previewBounds.Height);
         UpdateZoomLevelText();
         RedrawOverlay();
     }
@@ -2152,10 +2226,35 @@ public partial class MainWindow : Window, IAsyncDisposable
         SetBusyUi(!_busy);
     }
 
+    private (int Width, int Height) GetPreviewDecodeBounds()
+    {
+        int configuredWidth = _settings.PreviewMaxWidth;
+        int configuredHeight = _settings.PreviewMaxHeight;
+        if (configuredWidth <= 0 || configuredHeight <= 0)
+            return (0, 0);
+
+        double scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1.0;
+        double viewportWidth = ViewportHost.Bounds.Width * scaling;
+        double viewportHeight = ViewportHost.Bounds.Height * scaling;
+        if (viewportWidth <= 1 || viewportHeight <= 1)
+            return (configuredWidth, configuredHeight);
+
+        // Decode enough physical pixels for the current viewport. A zoom level
+        // above 1 raises the cap for newly started preview sessions, but never
+        // beyond twice the configured ordinary-window budget.
+        double zoom = Math.Clamp(_zoomFactor, 1.0, 2.0);
+        int targetWidth = Math.Max(1, (int)Math.Ceiling(viewportWidth * zoom));
+        int targetHeight = Math.Max(1, (int)Math.Ceiling(viewportHeight * zoom));
+        int capWidth = Math.Max(configuredWidth, (int)Math.Ceiling(configuredWidth * zoom));
+        int capHeight = Math.Max(configuredHeight, (int)Math.Ceiling(configuredHeight * zoom));
+        return (Math.Min(targetWidth, capWidth), Math.Min(targetHeight, capHeight));
+    }
+
     private void ClearPreviewSurfaceGeometry()
     {
         _sourceWidth = 0;
         _sourceHeight = 0;
+        _frameLines = [];
         _lastLines = [];
         SyncFrameAnnotations();
         SetBusyUi(!_busy);
@@ -2165,7 +2264,7 @@ public partial class MainWindow : Window, IAsyncDisposable
 
     private void SyncFrameAnnotations()
     {
-        ReplaceResultToasts(_lastLines);
+        ReplaceResultToasts(_frameLines);
         RedrawOverlay();
     }
 
@@ -2193,9 +2292,9 @@ public partial class MainWindow : Window, IAsyncDisposable
             DrawPreviewGuides(offsetX, offsetY, displayW, displayH);
 
         // Draw bounding boxes for OCR lines
-        if (!_lastLines.IsDefaultOrEmpty)
+        if (!_frameLines.IsDefaultOrEmpty)
         {
-            foreach (var item in _lastLines)
+            foreach (var item in _frameLines)
             {
                 bool isHovered = ReferenceEquals(_hoveredAnnotation, item) ||
                                  (_hoveredAnnotation is OcrLine o &&
@@ -2435,15 +2534,32 @@ public partial class MainWindow : Window, IAsyncDisposable
             Dispatcher.UIThread.Post(() => Append(line));
             return;
         }
-        _logLinesCount++;
-        TxtLogLineCount.Text = $"{_logLinesCount} 行";
-        Log.Text = string.IsNullOrEmpty(Log.Text) ? line : Log.Text + Environment.NewLine + line;
-        const int maxLogCharacters = 64 * 1024;
-        if (Log.Text.Length > maxLogCharacters)
+
+        if (line.Length > MaxLogCharacters)
         {
-            int start = Log.Text.IndexOf('\n', Log.Text.Length - maxLogCharacters);
-            Log.Text = start >= 0 ? Log.Text[(start + 1)..] : Log.Text[^maxLogCharacters..];
+            line = line[^MaxLogCharacters..];
         }
+
+        if (_logBuffer.Count > 0)
+        {
+            _logBufferCharacters += Environment.NewLine.Length;
+        }
+        _logBuffer.Enqueue(line);
+        _logBufferCharacters += line.Length;
+
+        while (_logBuffer.Count > MaxLogLines || _logBufferCharacters > MaxLogCharacters)
+        {
+            string removed = _logBuffer.Dequeue();
+            _logBufferCharacters -= removed.Length;
+            if (_logBuffer.Count > 0)
+            {
+                _logBufferCharacters -= Environment.NewLine.Length;
+            }
+        }
+
+        _logLinesCount = _logBuffer.Count;
+        TxtLogLineCount.Text = $"{_logLinesCount} 行";
+        Log.Text = string.Join(Environment.NewLine, _logBuffer);
         Log.CaretIndex = Log.Text?.Length ?? 0;
     }
 }
