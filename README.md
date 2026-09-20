@@ -36,7 +36,15 @@ dotnet run --project src/ScanFlowOcr.App
 dotnet run --project tests/ScanFlowOcr.SmokeTests -- --camera
 ```
 
-发布脚本见 `scripts/`（产物默认 `publish/win-x64`、`publish/linux-x64`）。
+发布打包（产物默认位于 `publish/win-x64`、`publish/linux-x64`）：
+
+```bash
+# Windows x64 自包含发布 (PowerShell 7)
+pwsh scripts/Publish-Win-x64.ps1 -SelfContained
+
+# Linux x64 自包含发布 (Bash)
+bash scripts/publish-linux-x64.sh
+```
 
 ## 仓库结构
 
@@ -52,7 +60,10 @@ tests/ScanFlowOcr.SmokeTests
 native/win-x64
 native/linux-x64
 docs/MEMORY-OPTIMIZATION.md
+docs/RELEASE-1.0.0.md
 scripts/
+.github/workflows/release.yml
+CHANGELOG.md
 ```
 
 ## 许可

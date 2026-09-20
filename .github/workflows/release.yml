@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Publish Windows x64 (Self-Contained)
+        shell: pwsh
+        run: |
+          ./scripts/Publish-Win-x64.ps1 -OutputDirectory publish/win-x64 -SelfContained
+
+      - name: Compress Windows Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/win-x64/* -DestinationPath ScanFlowOcr-win-x64.zip -Force
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScanFlowOcr-win-x64
+          path: ScanFlowOcr-win-x64.zip
+
+  build-linux:
+    name: Build Linux x64
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Publish Linux x64 (Self-Contained)
+        run: |
+          chmod +x scripts/publish-linux-x64.sh
+          ./scripts/publish-linux-x64.sh -o publish/linux-x64
+
+      - name: Compress Linux Package
+        run: |
+          tar -czvf ScanFlowOcr-linux-x64.tar.gz -C publish/linux-x64 .
+
+      - name: Upload Linux Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScanFlowOcr-linux-x64
+          path: ScanFlowOcr-linux-x64.tar.gz
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Windows Package
+        uses: actions/download-artifact@v4
+        with:
+          name: ScanFlowOcr-win-x64
+
+      - name: Download Linux Package
+        uses: actions/download-artifact@v4
+        with:
+          name: ScanFlowOcr-linux-x64
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ScanFlow-OCR ${{ github.ref_name }}
+          body_path: docs/RELEASE-1.0.0.md
+          draft: false
+          prerelease: false
+          files: |
+            ScanFlowOcr-win-x64.zip
+            ScanFlowOcr-linux-x64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
