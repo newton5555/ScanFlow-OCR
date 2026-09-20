@@ -80,7 +80,7 @@ public partial class MainWindow : Window, IAsyncDisposable
     private int _modeRequestRevision;
     private Point _dragStartPoint;
     private bool _isDraggingViewport;
-    // Drives bottom-right OCR toast highlight only (not overlay boxes).
+    // Set only from bottom-right toast hover; drives toast style + image box fill (location cue).
     private object? _hoveredAnnotation;
 
     public MainWindow() : this(
@@ -2304,16 +2304,19 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (_settings.ShowPreviewGuides)
             DrawPreviewGuides(offsetX, offsetY, displayW, displayH);
 
-        // Draw bounding boxes for OCR lines (hover highlight is toast-only via _hoveredAnnotation).
+        // OCR boxes: highlight fill when toast hover sets _hoveredAnnotation (boxes are not hit-test targets).
         if (!_frameLines.IsDefaultOrEmpty)
         {
             foreach (var item in _frameLines)
             {
+                bool isHovered = ReferenceEquals(_hoveredAnnotation, item) ||
+                                 (_hoveredAnnotation is OcrLine o &&
+                                  o.Text == item.Text &&
+                                  o.Bounds.Equals(item.Bounds));
+
                 var poly = new Polygon
                 {
-                    StrokeThickness = 2,
-                    Fill = Brushes.Transparent,
-                    Stroke = ResolveBrush("BrandBrush", Brushes.DodgerBlue),
+                    StrokeThickness = isHovered ? 3 : 2,
                     IsHitTestVisible = false,
                     Points =
                     [
@@ -2323,6 +2326,17 @@ public partial class MainWindow : Window, IAsyncDisposable
                         new Point(offsetX + item.Bounds.P3.X * scale, offsetY + item.Bounds.P3.Y * scale)
                     ]
                 };
+
+                if (isHovered)
+                {
+                    poly.Fill = ResolveBrush("SymbologyBadgeOcrTintBrush", new SolidColorBrush(Color.FromArgb(50, 0, 122, 255)));
+                    poly.Stroke = ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.DodgerBlue);
+                }
+                else
+                {
+                    poly.Fill = Brushes.Transparent;
+                    poly.Stroke = ResolveBrush("BrandBrush", Brushes.DodgerBlue);
+                }
 
                 OverlayCanvas.Children.Add(poly);
             }
@@ -2442,6 +2456,7 @@ public partial class MainWindow : Window, IAsyncDisposable
             {
                 _hoveredAnnotation = capturedLine;
                 ApplyToastHoverStyles();
+                RedrawOverlay();
             };
             card.PointerExited += (_, _) =>
             {
@@ -2452,6 +2467,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 {
                     _hoveredAnnotation = null;
                     ApplyToastHoverStyles();
+                    RedrawOverlay();
                 }
             };
             ResultToastStackOcr.Children.Add(card);
