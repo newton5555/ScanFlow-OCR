@@ -299,7 +299,7 @@ public partial class SettingsWindow : Window
         _draft.KeyboardEnabled = RbOutKeyboard.IsChecked == true;
         _draft.MqttEnabled = RbOutMqtt.IsChecked == true;
         _draft.TcpEnabled = RbOutTcp.IsChecked == true;
-        _draft.KeyboardTargetProcess = KeyboardTargetBox.Text?.Trim() ?? "notepad.exe";
+        _draft.KeyboardTargetProcess = KeyboardTargetBox.Text?.Trim() ?? (OperatingSystem.IsLinux() ? "gedit" : "notepad.exe");
         if (KeyboardSuffixCombo.SelectedItem is ComboBoxItem suffixItem &&
             Enum.TryParse<KeyboardSuffix>(suffixItem.Tag?.ToString(), out var suffix))
             _draft.KeyboardSuffix = suffix;

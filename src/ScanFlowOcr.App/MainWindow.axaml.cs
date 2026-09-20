@@ -203,7 +203,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             var snap = _activeSession.GetSnapshot();
             double fps = UpdateMetricRate("session", snap.FramesProcessed);
-            TxtSessionMetrics.Text = $"\u5e27 {snap.FramesReceived} \u00b7 {fps:0.0} FPS / \u5904\u7406 {snap.FramesProcessed}";
+            TxtSessionMetrics.Text = $"帧 {snap.FramesReceived} · {fps:0.0} FPS / 处理 {snap.FramesProcessed}";
             TxtPreviewMetrics.Text = _sourceWidth > 0
                 ? $"{_sourceWidth}×{_sourceHeight} · {fps:0.0} FPS"
                 : "会话预览中";
@@ -240,7 +240,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
 
         UpdateMetricRate("idle", 0);
-        TxtSessionMetrics.Text = "\u5e27 0 \u00b7 0.0 FPS / \u5904\u7406 0";
+        TxtSessionMetrics.Text = "帧 0 · 0.0 FPS / 处理 0";
         TxtPreviewMetrics.Text = PreviewImage.Source is not null && _sourceWidth > 0
             ? $"静态图 {_sourceWidth}×{_sourceHeight}"
             : "未启用";
@@ -1292,6 +1292,13 @@ public partial class MainWindow : Window, IAsyncDisposable
         leftover?.Dispose();
         Interlocked.Exchange(ref _previewUpdateScheduled, 0);
 
+        // 键盘模拟输出保护：停止扫描时立即清空键盘模拟未打完的队列，避免在外部窗口误输入
+        if (_settings.KeyboardEnabled)
+        {
+            _coordinator.ClearPending("keyboard");
+        }
+        UpdateOutputStatusIndicator();
+
         StartScanButton.IsEnabled = true;
         StartScanButton.IsVisible = true;
         StopScanButton.IsEnabled = false;
@@ -1709,6 +1716,14 @@ public partial class MainWindow : Window, IAsyncDisposable
             _preview = null;
             PreviewImage.Source = null;
             ClearPreviewSurfaceGeometry();
+
+            // 键盘模拟输出保护：停止预览时立即清空键盘模拟未打完的队列，避免在外部窗口误输入
+            if (_settings.KeyboardEnabled)
+            {
+                _coordinator.ClearPending("keyboard");
+            }
+            UpdateOutputStatusIndicator();
+
             StartPreviewButton.IsEnabled = true;
             StopPreviewButton.IsEnabled = false;
             OcrFrameButton.IsEnabled = false;

@@ -95,6 +95,19 @@ if [[ -f "${NATIVE_SRC}" ]] && [[ ! -f "${NATIVE_DEST_DIR}/libturbojpeg.so" ]]; 
     cp -f "${NATIVE_SRC}" "${NATIVE_DEST_DIR}/libturbojpeg.so"
 fi
 
+# 针对 Linux 发布定制默认配置：启用模拟键盘输出，并将目标设为 gedit
+SETTINGS_FILE="${OUTPUT_DIR}/appsettings.json"
+if [[ ! -f "${SETTINGS_FILE}" ]] && [[ -f "${REPO_ROOT}/src/ScanFlowOcr.App/appsettings.json" ]]; then
+    cp -f "${REPO_ROOT}/src/ScanFlowOcr.App/appsettings.json" "${SETTINGS_FILE}"
+fi
+if [[ -f "${SETTINGS_FILE}" ]]; then
+    sed -i 's/"KeyboardEnabled": *false/"KeyboardEnabled": true/g' "${SETTINGS_FILE}" || true
+    sed -i 's/"KeyboardTargetProcess": *"[^"]*"/"KeyboardTargetProcess": "gedit"/g' "${SETTINGS_FILE}" || true
+    sed -i 's/"MqttEnabled": *true/"MqttEnabled": false/g' "${SETTINGS_FILE}" || true
+    sed -i 's/"TcpEnabled": *true/"TcpEnabled": false/g' "${SETTINGS_FILE}" || true
+    echo ">>> 已将 Linux 默认配置定制为: 键盘模拟输出 -> gedit"
+fi
+
 # 自动生成 Linux 一键自赋权启动脚本 run.sh
 cat > "${OUTPUT_DIR}/run.sh" << 'EOF'
 #!/usr/bin/env bash

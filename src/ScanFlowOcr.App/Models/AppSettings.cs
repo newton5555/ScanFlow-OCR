@@ -53,7 +53,7 @@ public sealed class AppSettings
     public int TcpPort { get; set; } = 9100;
     public bool TcpTls { get; set; }
     public bool KeyboardEnabled { get; set; }
-    public string KeyboardTargetProcess { get; set; } = "notepad.exe";
+    public string KeyboardTargetProcess { get; set; } = OperatingSystem.IsLinux() ? "gedit" : "notepad.exe";
     public KeyboardSuffix KeyboardSuffix { get; set; } = KeyboardSuffix.Enter;
     public KeyboardSendMode KeyboardSendMode { get; set; } = KeyboardSendMode.Combined;
     public string KeyboardSeparator { get; set; } = " | ";

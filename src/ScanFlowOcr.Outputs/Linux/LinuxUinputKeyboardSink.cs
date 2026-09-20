@@ -15,10 +15,11 @@ namespace ScanFlowOcr.Outputs;
 [SupportedOSPlatform("linux")]
 public sealed class LinuxUinputKeyboardSink : IOutputSink
 {
-    private const int UiSetEvbit = unchecked((int)0x40045564);
-    private const int UiSetKeybit = unchecked((int)0x40045565);
-    private const int UiDevCreate = 0x5501;
-    private const int UiDevDestroy = 0x5502;
+    private const ulong UiSetEvbit = 0x40045564;
+    private const ulong UiSetKeybit = 0x40045565;
+    private const ulong UiDevSetup = 0x405C5503;
+    private const ulong UiDevCreate = 0x5501;
+    private const ulong UiDevDestroy = 0x5502;
     private const ushort EvSyn = 0x00;
     private const ushort EvKey = 0x01;
     private const ushort SynReport = 0;
@@ -27,10 +28,11 @@ public sealed class LinuxUinputKeyboardSink : IOutputSink
     private const int KeyTab = 15;
     private const int ORdwr = 0x0002;
 
+    private static readonly object GlobalGate = new();
+    private static int _globalFd = -1;
+    private static bool _globalCreated;
+
     private readonly KeyboardRoute _route;
-    private readonly object _gate = new();
-    private int _fd = -1;
-    private bool _created;
 
     public LinuxUinputKeyboardSink(KeyboardRoute route) => _route = route;
 
@@ -70,21 +72,54 @@ public sealed class LinuxUinputKeyboardSink : IOutputSink
         }
         catch (Exception ex)
         {
+            Console.Error.WriteLine($"[LinuxUinputKeyboardSink] Error: {ex}");
             return ValueTask.FromResult(new DeliveryReceipt(message.Record.EventId, "keyboard", DeliveryDisposition.NotDelivered, "UinputError", ex.Message));
         }
     }
 
     private DeliveryReceipt TypeAscii(OutputMessage message, string text)
     {
-        foreach (char c in text)
+        string normalized = NormalizeToAscii(text);
+        foreach (char c in normalized)
         {
             if (c is '\n' or '\r' or '\t') continue;
             if (c > 0x7F || char.IsControl(c))
-                return new(message.Record.EventId, "keyboard", DeliveryDisposition.NotDelivered, "UnicodeUnsupported",
-                    "Phase 1 Linux uinput types ASCII only.");
+            {
+                string msg = $"字符 U+{(int)c:X4} ('{c}') 暂不支持模拟键盘直接击键输出。";
+                Console.Error.WriteLine($"[LinuxUinputKeyboardSink] {msg}");
+                return new(message.Record.EventId, "keyboard", DeliveryDisposition.NotDelivered, "UnicodeUnsupported", msg);
+            }
         }
-        EmitAscii(text);
+        EmitAscii(normalized);
+        EmitSuffix();
         return Ok(message, "ok");
+    }
+
+    private static string NormalizeToAscii(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return text;
+        var sb = new StringBuilder(text.Length);
+        foreach (char c in text)
+        {
+            if (c == '\u3000') { sb.Append(' '); continue; }
+            if (c == '。') { sb.Append('.'); continue; }
+            if (c is >= '\uFF01' and <= '\uFF5E')
+            {
+                sb.Append((char)(c - 0xFEE0));
+                continue;
+            }
+            if (c is '：') { sb.Append(':'); continue; }
+            if (c is '，') { sb.Append(','); continue; }
+            if (c is '“' or '”') { sb.Append('"'); continue; }
+            if (c is '‘' or '’') { sb.Append('\''); continue; }
+            if (c is '（') { sb.Append('('); continue; }
+            if (c is '）') { sb.Append(')'); continue; }
+            if (c is '【' or '〔') { sb.Append('['); continue; }
+            if (c is '】' or '〕') { sb.Append(']'); continue; }
+            if (c is '—' or '–') { sb.Append('-'); continue; }
+            sb.Append(c);
+        }
+        return sb.ToString();
     }
 
     private void EmitSuffix()
@@ -97,22 +132,60 @@ public sealed class LinuxUinputKeyboardSink : IOutputSink
         };
         if (key is int k)
         {
-            EmitKey(k, 1); EmitKey(k, 0); EmitSyn();
+            EmitKeyPress(k, false);
         }
     }
 
-    private void EmitAscii(string text)
+    private static void EmitAscii(string text)
     {
-        foreach (char c in text)
+        for (int i = 0; i < text.Length; i++)
         {
-            if (c == '\t') { EmitKey(KeyTab, 1); EmitKey(KeyTab, 0); EmitSyn(); continue; }
-            if (c is '\n' or '\r') { EmitKey(KeyEnter, 1); EmitKey(KeyEnter, 0); EmitSyn(); continue; }
+            char c = text[i];
+            if (c == '\r')
+            {
+                // 如果后面紧跟 \n（Windows 换行 CRLF），跳过 \n，避免敲击两次回车
+                if (i + 1 < text.Length && text[i + 1] == '\n') i++;
+                EmitKeyPress(KeyEnter, false);
+                continue;
+            }
+            if (c == '\n')
+            {
+                EmitKeyPress(KeyEnter, false);
+                continue;
+            }
+            if (c == '\t')
+            {
+                EmitKeyPress(KeyTab, false);
+                continue;
+            }
             if (!TryMapAscii(c, out int code, out bool shift))
-                throw new InvalidOperationException($"No KEY_* mapping for U+{(int)c:X4}.");
-            if (shift) { EmitKey(KeyLeftShift, 1); EmitSyn(); }
-            EmitKey(code, 1); EmitKey(code, 0);
-            if (shift) EmitKey(KeyLeftShift, 0);
+                throw new InvalidOperationException($"No KEY_* mapping for U+{(int)c:X4} ('{c}').");
+            EmitKeyPress(code, shift);
+        }
+    }
+
+    private static void EmitKeyPress(int code, bool shift)
+    {
+        if (shift)
+        {
+            EmitKey(KeyLeftShift, 1);
             EmitSyn();
+            Thread.Sleep(5);
+        }
+
+        EmitKey(code, 1);
+        EmitSyn();
+        Thread.Sleep(8);
+
+        EmitKey(code, 0);
+        EmitSyn();
+        Thread.Sleep(5);
+
+        if (shift)
+        {
+            EmitKey(KeyLeftShift, 0);
+            EmitSyn();
+            Thread.Sleep(5);
         }
     }
 
@@ -170,55 +243,61 @@ public sealed class LinuxUinputKeyboardSink : IOutputSink
         'y' => 21, 'z' => 44, _ => 0
     };
 
-    private void EnsureDevice()
+    private static unsafe void EnsureDevice()
     {
-        lock (_gate)
+        lock (GlobalGate)
         {
-            if (_created) return;
-            _fd = Open("/dev/uinput", ORdwr);
-            if (_fd < 0) throw new InvalidOperationException("无法打开 /dev/uinput（需要权限）。");
-            if (Ioctl(_fd, UiSetEvbit, EvKey) < 0) throw new InvalidOperationException("UI_SET_EVBIT failed.");
+            if (_globalCreated && _globalFd >= 0) return;
+            _globalFd = Open("/dev/uinput", ORdwr);
+            if (_globalFd < 0)
+            {
+                int err = Marshal.GetLastPInvokeError();
+                throw new InvalidOperationException($"无法打开 /dev/uinput（errno={err}，需 chmod 666 /dev/uinput 或加入 input 组并配置 udev 规则）。");
+            }
+            if (Ioctl(_globalFd, UiSetEvbit, EvKey) < 0)
+                throw new InvalidOperationException("UI_SET_EVBIT failed.");
             for (int k = 1; k < 256; k++)
-                _ = Ioctl(_fd, UiSetKeybit, k);
+                _ = Ioctl(_globalFd, UiSetKeybit, k);
 
-            var name = new byte[80];
-            Encoding.ASCII.GetBytes("ScanFlowOCR Virtual Keyboard", name);
             var setup = new UinputSetup
             {
-                Id = new InputId { Bustype = 0x03, Vendor = 0x1234, Product = 0x5678, Version = 1 },
-                Name = name
+                Id = new InputId { Bustype = 0x03, Vendor = 0x1234, Product = 0x5678, Version = 1 }
             };
-            WriteSetup(_fd, ref setup);
-            if (Ioctl(_fd, UiDevCreate, 0) < 0) throw new InvalidOperationException("UI_DEV_CREATE failed.");
-            _created = true;
-            Thread.Sleep(50);
+            byte[] nameBytes = Encoding.ASCII.GetBytes("ScanFlowOCR Virtual Keyboard");
+            int len = Math.Min(nameBytes.Length, 79);
+            for (int i = 0; i < len; i++)
+                setup.Name[i] = nameBytes[i];
+
+            if (IoctlSetup(_globalFd, UiDevSetup, ref setup) < 0)
+            {
+                int err = Marshal.GetLastPInvokeError();
+                throw new InvalidOperationException($"UI_DEV_SETUP failed (errno={err})。");
+            }
+            if (Ioctl(_globalFd, UiDevCreate, 0) < 0)
+            {
+                int err = Marshal.GetLastPInvokeError();
+                throw new InvalidOperationException($"UI_DEV_CREATE failed (errno={err})。");
+            }
+            _globalCreated = true;
+            Thread.Sleep(60);
         }
     }
 
-    private void EmitKey(int code, int value)
+    private static void EmitKey(int code, int value)
     {
         var ev = new InputEvent { Type = EvKey, Code = (ushort)code, Value = value };
-        WriteEvent(_fd, ref ev);
+        WriteEvent(_globalFd, ref ev);
     }
 
-    private void EmitSyn()
+    private static void EmitSyn()
     {
         var ev = new InputEvent { Type = EvSyn, Code = SynReport, Value = 0 };
-        WriteEvent(_fd, ref ev);
+        WriteEvent(_globalFd, ref ev);
     }
 
     public ValueTask DisposeAsync()
     {
-        lock (_gate)
-        {
-            if (_fd >= 0)
-            {
-                if (_created) _ = Ioctl(_fd, UiDevDestroy, 0);
-                _ = Close(_fd);
-                _fd = -1;
-                _created = false;
-            }
-        }
+        // 保持单例虚拟键盘设备常驻，避免每次消息发送后热拔插注销导致桌面焦点丢失或事件冲刷丢失
         return ValueTask.CompletedTask;
     }
 
@@ -239,18 +318,6 @@ public sealed class LinuxUinputKeyboardSink : IOutputSink
         finally { Marshal.FreeHGlobal(ptr); }
     }
 
-    private static void WriteSetup(int fd, ref UinputSetup setup)
-    {
-        int size = Marshal.SizeOf<UinputSetup>();
-        nint ptr = Marshal.AllocHGlobal(size);
-        try
-        {
-            Marshal.StructureToPtr(setup, ptr, false);
-            if (Write(fd, ptr, (ulong)size) != size) throw new IOException("write(uinput_setup) incomplete.");
-        }
-        finally { Marshal.FreeHGlobal(ptr); }
-    }
-
     [StructLayout(LayoutKind.Sequential)]
     private struct TimeVal { public long TvSec; public long TvUsec; }
     [StructLayout(LayoutKind.Sequential)]
@@ -258,18 +325,18 @@ public sealed class LinuxUinputKeyboardSink : IOutputSink
     [StructLayout(LayoutKind.Sequential)]
     private struct InputId { public ushort Bustype; public ushort Vendor; public ushort Product; public ushort Version; }
     [StructLayout(LayoutKind.Sequential)]
-    private struct UinputSetup
+    private unsafe struct UinputSetup
     {
         public InputId Id;
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 80)]
-        public byte[] Name;
+        public fixed byte Name[80];
         public uint FfEffectsMax;
     }
 
-    [DllImport("libc", SetLastError = true, CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)] private static extern int Open(string pathname, int flags);
-    [DllImport("libc", SetLastError = true)] private static extern int Close(int fd);
-    [DllImport("libc", SetLastError = true)] private static extern int Ioctl(int fd, int request, int arg);
-    [DllImport("libc", SetLastError = true)] private static extern long Write(int fd, nint buf, ulong count);
+    [DllImport("libc", EntryPoint = "open", SetLastError = true, CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)] private static extern int Open(string pathname, int flags);
+    [DllImport("libc", EntryPoint = "close", SetLastError = true)] private static extern int Close(int fd);
+    [DllImport("libc", EntryPoint = "ioctl", SetLastError = true)] private static extern int Ioctl(int fd, ulong request, int arg);
+    [DllImport("libc", EntryPoint = "ioctl", SetLastError = true)] private static extern int IoctlSetup(int fd, ulong request, ref UinputSetup setup);
+    [DllImport("libc", EntryPoint = "write", SetLastError = true)] private static extern long Write(int fd, nint buf, ulong count);
 }
 
 /// <summary>Factory for the platform keyboard sink.</summary>

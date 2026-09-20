@@ -92,6 +92,31 @@ try {
         Copy-Item -LiteralPath $nativeSrc -Destination $nativeDestFile -Force
     }
 
+    # 针对 Linux 发布定制默认配置：启用模拟键盘输出，并将目标设为 gedit
+    $settingsFile = Join-Path $publishPath 'appsettings.json'
+    if (-not (Test-Path -LiteralPath $settingsFile)) {
+        $sourceSettings = Join-Path $repoRoot 'src/ScanFlowOcr.App/appsettings.json'
+        if (Test-Path -LiteralPath $sourceSettings) {
+            Copy-Item -LiteralPath $sourceSettings -Destination $settingsFile -Force
+        }
+    }
+    if (Test-Path -LiteralPath $settingsFile) {
+        try {
+            $jsonContent = Get-Content -LiteralPath $settingsFile -Raw -Encoding utf8 | ConvertFrom-Json
+            if ($jsonContent.ScanFlowOcr) {
+                $jsonContent.ScanFlowOcr.KeyboardEnabled = $true
+                $jsonContent.ScanFlowOcr.KeyboardTargetProcess = "gedit"
+                $jsonContent.ScanFlowOcr.MqttEnabled = $false
+                $jsonContent.ScanFlowOcr.TcpEnabled = $false
+                $newJson = $jsonContent | ConvertTo-Json -Depth 10
+                [IO.File]::WriteAllText($settingsFile, $newJson, (New-Object System.Text.UTF8Encoding($false)))
+                Write-Host ">>> 已将 Linux 默认配置定制为: 键盘模拟输出 -> gedit" -ForegroundColor Cyan
+            }
+        } catch {
+            Write-Warning "定制 appsettings.json 失败: $_"
+        }
+    }
+
     # 自动生成 Linux 一键自赋权启动脚本 run.sh (严格采用 LF 换行符)
     $runShPath = Join-Path $publishPath 'run.sh'
     $runShContent = @'

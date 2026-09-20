@@ -347,7 +347,10 @@ public sealed class OutputCoordinator : IRecordDelivery, IAsyncDisposable
         int delaySeconds = item.SinkId == "keyboard" ? 1 : (int)Math.Min(30,
             2 * Math.Pow(2, Math.Min(4, item.Attempt)));
         cmd.Parameters.AddWithValue("$due", DateTimeOffset.UtcNow.AddSeconds(delaySeconds).ToString("O"));
-        cmd.Parameters.AddWithValue("$error", (object?)receipt.Code ?? DBNull.Value);
+        string errorText = !string.IsNullOrWhiteSpace(receipt.Message)
+            ? $"{receipt.Code}: {receipt.Message}"
+            : (receipt.Code ?? "");
+        cmd.Parameters.AddWithValue("$error", string.IsNullOrEmpty(errorText) ? DBNull.Value : errorText);
         cmd.Parameters.AddWithValue("$id", item.EventId.ToString("N"));
         cmd.Parameters.AddWithValue("$sink", item.SinkId);
         cmd.ExecuteNonQuery();
@@ -356,9 +359,9 @@ public sealed class OutputCoordinator : IRecordDelivery, IAsyncDisposable
         RefreshCounts(db);
         _lastReceiptCode = receipt.Code;
         _lastError = state == Complete ? null : state == Uncertain
-            ? item.SinkId + " 发送结果不确定，需人工核对。" : item.SinkId + " 未送达，正在重试。";
+            ? item.SinkId + " 发送结果不确定，需人工核对。" : item.SinkId + " 未送达: " + errorText;
         Log(state == Complete ? "delivery-complete" : state == Uncertain ? "delivery-uncertain" : "delivery-retry",
-            item.EventId, item.SinkId);
+            item.EventId, item.SinkId, errorText);
     }
 
     private void EnsureDatabase()
@@ -430,8 +433,13 @@ public sealed class OutputCoordinator : IRecordDelivery, IAsyncDisposable
         foreach (var wake in _wakes.Values) if (wake.CurrentCount == 0) wake.Release();
     }
 
-    private void Log(string kind, Guid? eventId, string? sinkId) =>
-        _logger.Information("{EventKind} eventId={EventId} sinkId={SinkId}", kind, eventId, sinkId);
+    private void Log(string kind, Guid? eventId, string? sinkId, string? details = null)
+    {
+        if (!string.IsNullOrEmpty(details))
+            _logger.Information("{EventKind} eventId={EventId} sinkId={SinkId} details={Details}", kind, eventId, sinkId, details);
+        else
+            _logger.Information("{EventKind} eventId={EventId} sinkId={SinkId}", kind, eventId, sinkId);
+    }
 
     public void LogLifecycle(string eventKind) => Log(eventKind, null, null);
 
