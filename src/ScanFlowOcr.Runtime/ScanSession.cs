@@ -242,14 +242,13 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
         if (frame.Input.Layout.Encoding == FrameEncoding.Jpeg)
         {
             var decoded = decoder.DecodeBgr(frame.Input, _allocator);
-            var cropped = CropBgr(decoded.Input, region);
-            return (decoded, cropped, cropped?.Input ?? decoded.Input);
+            try { return (decoded, null, CropBgrView(decoded.Input, region)); }
+            catch { decoded.Dispose(); throw; }
         }
         if (frame.Input.Layout.PixelFormat == PixelFormat.Bgr24)
         {
             RawImages.ValidateBgr(frame.Input);
-            var croppedBgr = CropBgr(frame.Input, region);
-            return (null, croppedBgr, croppedBgr?.Input ?? frame.Input);
+            return (null, null, CropBgrView(frame.Input, region));
         }
         RawImages.ValidateBgra(frame.Input);
         if (region is null)
@@ -261,19 +260,29 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
         return (null, croppedBgra, croppedBgra?.Input ?? frame.Input);
     }
 
-    private ImageLease? CropBgr(ImageInput input, Rect2? region)
+    private static ImageInput CropBgrView(ImageInput input, Rect2? region)
     {
-        if (region is not Rect2 r) return null;
+        if (region is not Rect2 r) return input;
         RawImages.ValidateBgr(input);
         int x = (int)r.X, y = (int)r.Y, w = (int)r.Width, h = (int)r.Height;
         if (x < 0 || y < 0 || w < 1 || h < 1 || (long)x + w > input.Layout.Width || (long)y + h > input.Layout.Height)
             throw new ArgumentException("识别区域超出图像范围。");
         var plane = input.Layout.Planes[0];
-        var result = _allocator.Allocate(input.Stamp, JpegDecoder.BgrLayout(w, h), checked(w * h * 3), new(1, 0, x, 0, 1, y, 0, 0, 1));
-        for (int row = 0; row < h; row++)
-            input.Buffer.Span.Slice(plane.Offset + (y + row) * plane.StrideBytes + x * 3, w * 3)
-                .CopyTo(result.WritableBuffer.Span.Slice(row * w * 3, w * 3));
-        return result;
+        var transform = input.ImageToSource;
+        return input with
+        {
+            Layout = input.Layout with
+            {
+                Width = w, Height = h,
+                Planes = [new(checked(plane.Offset + y * plane.StrideBytes + x * 3), plane.StrideBytes, checked(w * 3), h)]
+            },
+            ImageToSource = transform with
+            {
+                M13 = transform.M11 * x + transform.M12 * y + transform.M13,
+                M23 = transform.M21 * x + transform.M22 * y + transform.M23,
+                M33 = transform.M31 * x + transform.M32 * y + transform.M33
+            }
+        };
     }
 
     private ImageLease? CropBgraToBgr(ImageInput input, Rect2? region)
@@ -443,7 +452,7 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
                         try
                         {
                             color = frame.Input.Layout.Encoding == FrameEncoding.Jpeg
-                                ? decoder.DecodeBgra(frame.Input, _allocator)
+                                ? decoder.DecodePreview(frame.Input, _allocator, _profile.Preview.MaxWidth, _profile.Preview.MaxHeight)
                                 : frame.Retain();
                         }
                         catch (InvalidDataException)
@@ -469,7 +478,7 @@ public sealed class ScanSession : IScanSession, IFrameReceiver
                             var layout = new ImageLayout(FrameEncoding.Raw, PixelFormat.Bgra32, w, h,
                                 [new(0, checked(w * 4), checked(w * 4), h)], ColorRange.Full, ColorMatrix.Unspecified);
                             var image = _allocator.Allocate(input.Stamp, layout, checked(w * h * 4),
-                                new((double)input.Layout.Width / w, 0, 0, 0, (double)input.Layout.Height / h, 0, 0, 0, 1));
+                                new((double)frame.Input.Layout.Width / w, 0, 0, 0, (double)frame.Input.Layout.Height / h, 0, 0, 0, 1));
                             var destination = image.WritableBuffer.Span;
                             var source = input.Buffer.Span;
                             var plane = input.Layout.Planes[0];

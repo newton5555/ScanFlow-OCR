@@ -23,8 +23,8 @@ public sealed class AppSettings
 
     public bool PreviewEnabled { get; set; } = true;
     public int PreviewMaxFps { get; set; } = 15;
-    public int PreviewMaxWidth { get; set; }
-    public int PreviewMaxHeight { get; set; }
+    public int PreviewMaxWidth { get; set; } = 1280;
+    public int PreviewMaxHeight { get; set; } = 720;
 
     public int PreferredCameraIndex { get; set; }
     public int PreferredModeIndex { get; set; }

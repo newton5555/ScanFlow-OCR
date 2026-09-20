@@ -42,6 +42,29 @@ using (var lease = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 409
     Check(allocator.LiveBytes == 4096, "live bytes with retain");
 }
 Check(allocator.LiveBytes == 0, "live bytes after dispose");
+{
+    var original = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 4096, ImageTransform.Identity);
+    original.WritableBuffer.Span.Fill(123);
+    using var survivor = original.Retain();
+    original.Dispose();
+    original.Dispose();
+    Check(survivor.Input.Buffer.Span[4095] == 123 && allocator.LiveBytes == 4096,
+        "native pixels survive owner disposal while retained");
+}
+Check(allocator.LiveBytes == 0, "native pixels released after final reference");
+{
+    using var source = allocator.Allocate(stamp, JpegDecoder.BgrLayout(8, 8), 192, ImageTransform.Identity);
+    source.WritableBuffer.Span.Fill(42);
+    var cropMethod = typeof(ScanFlowOcr.Runtime.ScanSession).GetMethod("CropBgrView",
+        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+    var view = (ImageInput)cropMethod.Invoke(null, [source.Input, new Rect2(2, 3, 4, 2)])!;
+    Check(view.Layout.Planes[0].Offset == 78 && view.Layout.Planes[0].StrideBytes == 24,
+        "ROI uses original stride and offset");
+    Check(allocator.LiveBytes == 192 && view.ImageToSource.M13 == 2 && view.ImageToSource.M23 == 3,
+        "ROI view allocates no pixel copy and preserves source position");
+    source.WritableBuffer.Span[78] = 99;
+    Check(view.Buffer.Span[view.Layout.Planes[0].Offset] == 99, "ROI shares retained source pixels");
+}
 
 {
     const int width = 2;
@@ -124,6 +147,23 @@ Check(typeof(ScanFlowOcr.Runtime.ScanSession).IsClass, "ScanSession type present
         ? "native/win-x64/turbojpeg.dll" : "native/linux-x64/libturbojpeg.so");
     if (File.Exists(nativeJpeg))
     {
+        using (var decoder = new JpegDecoder(nativeJpeg))
+        {
+            var testAllocator = new ImageAllocator(64 * 64 * 4);
+            byte[] scaledJpeg = StillImages.EncodeJpegFromBgr(new byte[64 * 64 * 3], 64, 64, 90);
+            var jpegInput = new ImageInput(stamp,
+                new ImageLayout(FrameEncoding.Jpeg, PixelFormat.Unknown, 64, 64, [], ColorRange.Full, ColorMatrix.Unspecified),
+                scaledJpeg, ImageTransform.Identity);
+            using (var preview = decoder.DecodePreview(jpegInput, testAllocator, 16, 16))
+            {
+                Check(preview.Input.Layout.Width == 16 && preview.Input.Layout.Height == 16,
+                    "JPEG preview decoded natively at quarter resolution");
+                Check(testAllocator.LiveBytes == 16 * 16 * 4,
+                    "scaled JPEG preview never allocates full pixel frame");
+                Check(preview.Input.ImageToSource.M11 == 4, "scaled preview maps to source coordinates");
+            }
+            Check(testAllocator.LiveBytes == 0, "scaled preview memory released");
+        }
         byte[] pixels = new byte[8 * 8 * 3];
         byte[] jpeg = StillImages.EncodeJpegFromBgr(pixels, 8, 8, 90);
         var cameraId = new CameraId("test", "jpeg");

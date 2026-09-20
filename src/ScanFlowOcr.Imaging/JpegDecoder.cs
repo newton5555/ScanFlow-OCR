@@ -30,6 +30,8 @@ public sealed unsafe class JpegDecoder : IDisposable
         => Decode(jpeg, allocator, PixelFormat.Gray8);
     public ImageLease DecodeBgra(ImageInput jpeg, ImageAllocator allocator)
         => Decode(jpeg, allocator, PixelFormat.Bgra32);
+    public ImageLease DecodePreview(ImageInput jpeg, ImageAllocator allocator, int maxWidth, int maxHeight)
+        => Decode(jpeg, allocator, PixelFormat.Bgra32, maxWidth, maxHeight);
     public ImageLease DecodeBgr(ImageInput jpeg, ImageAllocator allocator)
         => Decode(jpeg, allocator, PixelFormat.Bgr24);
     public int DecodeBgrInto(ImageInput jpeg, Span<byte> destination)
@@ -54,7 +56,7 @@ public sealed unsafe class JpegDecoder : IDisposable
             return total;
         }
     }
-    private ImageLease Decode(ImageInput jpeg, ImageAllocator allocator, PixelFormat format)
+    private ImageLease Decode(ImageInput jpeg, ImageAllocator allocator, PixelFormat format, int maxWidth = 0, int maxHeight = 0)
     {
         ObjectDisposedException.ThrowIf(_handle == 0, this);
         int tjFormat = TurboJpegPixelFormat(format);
@@ -65,6 +67,16 @@ public sealed unsafe class JpegDecoder : IDisposable
             if (_header(_handle, input, (nuint)jpeg.Buffer.Length, &w, &h, &sub, &color) != 0 || w <= 0 || h <= 0)
                 throw new InvalidDataException("JPEG 头部无效。");
             if (w != jpeg.Layout.Width || h != jpeg.Layout.Height) throw new InvalidDataException("JPEG 尺寸与相机协商模式不一致。");
+            int originalWidth = w, originalHeight = h;
+            // Native JPEG IDCT scaling avoids allocating full-resolution preview pixels.
+            int divisor = 1;
+            if (maxWidth > 0 && maxHeight > 0)
+                while (divisor < 8 &&
+                       (w + divisor * 2 - 1) / (divisor * 2) >= maxWidth &&
+                       (h + divisor * 2 - 1) / (divisor * 2) >= maxHeight)
+                    divisor *= 2;
+            w = (w + divisor - 1) / divisor;
+            h = (h + divisor - 1) / divisor;
             int stride = checked(w * bytesPerPixel);
             var layout = format switch
             {
@@ -73,7 +85,14 @@ public sealed unsafe class JpegDecoder : IDisposable
                 PixelFormat.Bgra32 => BgraLayout(w, h),
                 _ => throw new ArgumentOutOfRangeException(nameof(format))
             };
-            var result = allocator.Allocate(jpeg.Stamp, layout, checked(stride * h), jpeg.ImageToSource);
+            var transform = jpeg.ImageToSource;
+            double sx = (double)originalWidth / w, sy = (double)originalHeight / h;
+            var result = allocator.Allocate(jpeg.Stamp, layout, checked(stride * h),
+                transform with
+                {
+                    M11 = transform.M11 * sx, M21 = transform.M21 * sx, M31 = transform.M31 * sx,
+                    M12 = transform.M12 * sy, M22 = transform.M22 * sy, M32 = transform.M32 * sy
+                });
             try
             {
                 fixed (byte* output = result.WritableBuffer.Span)

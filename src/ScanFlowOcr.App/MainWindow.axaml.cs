@@ -1152,6 +1152,14 @@ public partial class MainWindow : Window, IAsyncDisposable
         ScanSession session;
         try
         {
+            // Still-image and continuous OCR are mutually exclusive. Release the idle model
+            // before the session creates its own reader and native inference workspace.
+            if (_ocrReader is not null)
+            {
+                await _ocrReader.DisposeAsync().ConfigureAwait(true);
+                _ocrReader = null;
+                _ocrReaderModel = null;
+            }
             session = new ScanSession(_cameraProvider, _ocrFactory, jpegPath!, profile, _coordinator);
         }
         catch (Exception ex)
@@ -2430,6 +2438,12 @@ public partial class MainWindow : Window, IAsyncDisposable
         _logLinesCount++;
         TxtLogLineCount.Text = $"{_logLinesCount} 行";
         Log.Text = string.IsNullOrEmpty(Log.Text) ? line : Log.Text + Environment.NewLine + line;
+        const int maxLogCharacters = 64 * 1024;
+        if (Log.Text.Length > maxLogCharacters)
+        {
+            int start = Log.Text.IndexOf('\n', Log.Text.Length - maxLogCharacters);
+            Log.Text = start >= 0 ? Log.Text[(start + 1)..] : Log.Text[^maxLogCharacters..];
+        }
         Log.CaretIndex = Log.Text?.Length ?? 0;
     }
 }
