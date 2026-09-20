@@ -232,7 +232,8 @@ public sealed class SimdPaddleOcrFactory : IOcrReaderFactory
                     confidence,
                     Language: null,
                     Words: [],
-                    ReadingAngleDegrees: QuadReadingAxis.Degrees(quad))
+                    // Direct REC receives the input unchanged: no crop rotation or CLS.
+                    ReadingAngleDegrees: 0)
             ];
         }
 

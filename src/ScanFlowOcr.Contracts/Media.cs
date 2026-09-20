@@ -32,24 +32,43 @@ public readonly record struct Point2(double X, double Y);
 public readonly record struct Rect2(double X, double Y, double Width, double Height);
 public readonly record struct Quad(Point2 P0, Point2 P1, Point2 P2, Point2 P3);
 
-// Reading axis from DET quad: longer edge direction, optional CLS 180-degree flip.
+// Mirrors Sdcb.SimdPaddleOCR 1.4.1 PPOCRCrop / Warp (commit 6fda1085):
+// perspective crop, clockwise vertical rotation, then the actual CLS flip.
+// Recheck this geometry when upgrading that dependency.
 public static class QuadReadingAxis
 {
     public static Point2 Center(in Quad q) =>
         new((q.P0.X + q.P1.X + q.P2.X + q.P3.X) * 0.25,
             (q.P0.Y + q.P1.Y + q.P2.Y + q.P3.Y) * 0.25);
 
-    /// <summary>Image-space degrees from +X, CCW-positive (Atan2). CLS AppliedRotation 180 flips the arrow.</summary>
+    /// <summary>Reading direction at the box center, +X = 0, +Y = 90 (screen-clockwise).</summary>
     public static double Degrees(in Quad q, int appliedRotationDegrees = 0)
     {
-        double dx01 = q.P1.X - q.P0.X;
-        double dy01 = q.P1.Y - q.P0.Y;
-        double dx12 = q.P2.X - q.P1.X;
-        double dy12 = q.P2.Y - q.P1.Y;
-        double len01Sq = dx01 * dx01 + dy01 * dy01;
-        double len12Sq = dx12 * dx12 + dy12 * dy12;
-        double dx = len01Sq >= len12Sq ? dx01 : dx12;
-        double dy = len01Sq >= len12Sq ? dy01 : dy12;
+        double width = Math.Max(1, Math.Floor(Math.Max(Distance(q.P0, q.P1), Distance(q.P2, q.P3))));
+        double height = Math.Max(1, Math.Floor(Math.Max(Distance(q.P0, q.P3), Distance(q.P1, q.P2))));
+        bool rotateVertical = height >= width * 1.5;
+
+        double dx1 = q.P1.X - q.P2.X, dx2 = q.P3.X - q.P2.X;
+        double dy1 = q.P1.Y - q.P2.Y, dy2 = q.P3.Y - q.P2.Y;
+        double dx3 = q.P0.X - q.P1.X + q.P2.X - q.P3.X;
+        double dy3 = q.P0.Y - q.P1.Y + q.P2.Y - q.P3.Y;
+        double g = 0, h = 0;
+        if (Math.Abs(dx3) > 1e-12 || Math.Abs(dy3) > 1e-12)
+        {
+            double denominator = dx1 * dy2 - dx2 * dy1;
+            g = (dx3 * dy2 - dx2 * dy3) / denominator;
+            h = (dx1 * dy3 - dx3 * dy1) / denominator;
+        }
+        double a = q.P1.X - q.P0.X + g * q.P1.X;
+        double b = q.P3.X - q.P0.X + h * q.P3.X;
+        double d = q.P1.Y - q.P0.Y + g * q.P1.Y;
+        double e = q.P3.Y - q.P0.Y + h * q.P3.Y;
+        var center = Center(q);
+        // Homography derivative at the displayed center; its common positive
+        // denominator does not affect the angle. Clockwise crop rotation maps
+        // recognition +X back to crop -V, not +V.
+        double dx = rotateVertical ? h * center.X - b : a - g * center.X;
+        double dy = rotateVertical ? h * center.Y - e : d - g * center.Y;
         double deg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
         if (appliedRotationDegrees is 180 or -180)
             deg += 180.0;
@@ -58,6 +77,9 @@ public static class QuadReadingAxis
         if (deg <= -180.0) deg += 360.0;
         return deg;
     }
+
+    private static double Distance(Point2 a, Point2 b) =>
+        Math.Sqrt((b.X - a.X) * (b.X - a.X) + (b.Y - a.Y) * (b.Y - a.Y));
 }
 
 // Column-vector convention: source = H * [inputX, inputY, 1], then divide by w.

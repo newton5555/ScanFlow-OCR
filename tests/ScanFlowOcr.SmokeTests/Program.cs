@@ -33,7 +33,7 @@ if (args.Contains("--keyboard-live", StringComparer.Ordinal))
 
 Console.WriteLine("=== ScanFlow-OCR smoke ===");
 
-// DET quad reading axis (geometry + optional CLS 180 flip)
+// Reading axis follows the actual perspective crop / vertical rotation / CLS chain.
 {
     var horiz = new Quad(new(0, 0), new(100, 0), new(100, 20), new(0, 20));
     Check(Math.Abs(QuadReadingAxis.Degrees(horiz) - 0) < 0.01, "quad reading axis horizontal");
@@ -41,7 +41,15 @@ Console.WriteLine("=== ScanFlow-OCR smoke ===");
         "quad reading axis horizontal + CLS 180");
     var vert = new Quad(new(0, 0), new(20, 0), new(20, 100), new(0, 100));
     double vertDeg = QuadReadingAxis.Degrees(vert);
-    Check(Math.Abs(vertDeg - 90) < 0.01, "quad reading axis vertical ~90");
+    Check(Math.Abs(vertDeg + 90) < 0.01, "vertical clockwise crop maps REC +X to source up");
+    Check(Math.Abs(QuadReadingAxis.Degrees(vert, 180) - 90) < 0.01, "vertical crop + CLS flip maps down");
+    var nearSquare = new Quad(new(0, 0), new(20, 0), new(20, 29), new(0, 29));
+    Check(Math.Abs(QuadReadingAxis.Degrees(nearSquare)) < 0.01, "taller box below 1.5 keeps horizontal reading");
+    var threshold = new Quad(new(0, 0), new(20.9, 0), new(20.9, 30), new(0, 30));
+    Check(Math.Abs(QuadReadingAxis.Degrees(threshold) + 90) < 0.01, "crop threshold uses floored dimensions");
+    var skew = new Quad(new(0, 0), new(100, 20), new(80, 60), new(0, 40));
+    Check(Math.Abs(QuadReadingAxis.Degrees(skew) - Math.Atan2(38, 169) * 180 / Math.PI) < 0.01,
+        "perspective center reading differs from top edge");
     var c = QuadReadingAxis.Center(horiz);
     Check(Math.Abs(c.X - 50) < 0.01 && Math.Abs(c.Y - 10) < 0.01, "quad center");
 }

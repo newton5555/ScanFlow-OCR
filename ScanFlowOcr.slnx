@@ -12,6 +12,7 @@
   <Folder Name="/docs/">
     <File Path="docs/MEMORY-OPTIMIZATION.md" />
     <File Path="docs/RELEASE-1.0.0.md" />
+    <File Path="docs/RELEASE-1.0.1.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />

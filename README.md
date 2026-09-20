@@ -57,7 +57,7 @@ pwsh scripts/Publish-Win-x64.ps1 -SelfContained
 bash scripts/publish-linux-x64.sh
 ```
 
-发布说明与变更记录：`docs/RELEASE-1.0.0.md`、`CHANGELOG.md`。
+发布说明与变更记录：`docs/RELEASE-1.0.1.md`、`CHANGELOG.md`。
 
 ## 仓库结构
 
@@ -73,7 +73,7 @@ tests/ScanFlowOcr.SmokeTests
 native/win-x64
 native/linux-x64
 docs/MEMORY-OPTIMIZATION.md
-docs/RELEASE-1.0.0.md
+docs/RELEASE-1.0.1.md
 scripts/
 .github/workflows/release.yml
 CHANGELOG.md

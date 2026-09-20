@@ -83,11 +83,22 @@ jobs:
         with:
           name: ScanFlowOcr-linux-x64
 
+      - name: Resolve release notes
+        id: notes
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          NOTES="docs/RELEASE-${VER}.md"
+          if [ ! -f "$NOTES" ]; then
+            echo "Missing $NOTES" >&2
+            exit 1
+          fi
+          echo "path=$NOTES" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ScanFlow-OCR ${{ github.ref_name }}
-          body_path: docs/RELEASE-1.0.0.md
+          body_path: ${{ steps.notes.outputs.path }}
           draft: false
           prerelease: false
           files: |
