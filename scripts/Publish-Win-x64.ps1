@@ -35,18 +35,20 @@ if (-not (Test-Path -LiteralPath $projectPath)) {
     throw "未找到工程文件：$projectPath"
 }
 
-# 解析输出目录（默认直接发布到仓库根目录 publish）
+# 解析输出目录（默认直接发布到 publish/win-x64）
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     if ($Daily -or -not [string]::IsNullOrWhiteSpace($Date)) {
         $targetDate = if (-not [string]::IsNullOrWhiteSpace($Date)) { $Date } else { Get-Date -Format 'yyyyMMdd' }
-        $OutputDirectory = "publish/$targetDate"
+        $OutputDirectory = "publish/$targetDate/win-x64"
     } else {
-        $OutputDirectory = 'publish'
+        $OutputDirectory = 'publish/win-x64'
     }
 }
 $publishPath = [IO.Path]::GetFullPath($OutputDirectory, $repoRoot)
 
-if (-not (Test-Path -LiteralPath $publishPath)) {
+if (Test-Path -LiteralPath $publishPath) {
+    Get-ChildItem -LiteralPath $publishPath -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+} else {
     New-Item -ItemType Directory -Path $publishPath -Force | Out-Null
 }
 

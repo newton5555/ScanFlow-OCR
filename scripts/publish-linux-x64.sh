@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${OUTPUT_DIR}" ]]; then
-    OUTPUT_DIR="${REPO_ROOT}/publish"
+    OUTPUT_DIR="${REPO_ROOT}/publish/linux-x64"
 fi
 
 mkdir -p "${OUTPUT_DIR}"
@@ -95,7 +95,48 @@ if [[ -f "${NATIVE_SRC}" ]] && [[ ! -f "${NATIVE_DEST_DIR}/libturbojpeg.so" ]]; 
     cp -f "${NATIVE_SRC}" "${NATIVE_DEST_DIR}/libturbojpeg.so"
 fi
 
-# 为输出的可执行文件赋予权限
+# 自动生成 Linux 一键自赋权启动脚本 run.sh
+cat > "${OUTPUT_DIR}/run.sh" << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAIN_BIN="${SCRIPT_DIR}/ScanFlowOcr.App"
+
+if [ ! -f "${MAIN_BIN}" ]; then
+    echo "错误: 未找到主程序文件: ${MAIN_BIN}" >&2
+    exit 1
+fi
+
+if [ ! -x "${MAIN_BIN}" ]; then
+    chmod +x "${MAIN_BIN}" 2>/dev/null || true
+fi
+
+export LD_LIBRARY_PATH="${SCRIPT_DIR}:${SCRIPT_DIR}/native/linux-x64:${LD_LIBRARY_PATH:-}"
+
+echo "正在启动 ScanFlow-OCR 桌面端..."
+exec "${MAIN_BIN}" "$@"
+EOF
+chmod +x "${OUTPUT_DIR}/run.sh"
+
+# 自动生成权限初始化脚本 setup-permissions.sh
+cat > "${OUTPUT_DIR}/setup-permissions.sh" << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "正在为 ScanFlow-OCR 产物赋予执行权限..."
+chmod +x "${SCRIPT_DIR}/ScanFlowOcr.App" 2>/dev/null || true
+chmod +x "${SCRIPT_DIR}"/*.sh 2>/dev/null || true
+
+find "${SCRIPT_DIR}" -type f -name "*.so*" -exec chmod 755 {} + 2>/dev/null || true
+
+echo "权限配置完成！您现在可以直接执行: ./run.sh 或 ./ScanFlowOcr.App"
+EOF
+chmod +x "${OUTPUT_DIR}/setup-permissions.sh"
+
+# 检查主程序产物
 MAIN_BIN="${OUTPUT_DIR}/ScanFlowOcr.App"
 if [[ -f "${MAIN_BIN}" ]]; then
     chmod +x "${MAIN_BIN}"
@@ -105,7 +146,9 @@ if [[ -f "${MAIN_BIN}" ]]; then
     echo "ScanFlow-OCR Linux x64 发布成功！"
     echo "交付目录 : ${OUTPUT_DIR}"
     echo "主程序   : ScanFlowOcr.App (${BIN_SIZE})"
-    echo "执行运行 : cd \"${OUTPUT_DIR}\" && ./ScanFlowOcr.App"
+    echo "启动脚本 : run.sh（内置自动赋权与 LD_LIBRARY_PATH 配置）"
+    echo "赋权脚本 : setup-permissions.sh"
+    echo "启动方法 : 在 Linux 终端执行 bash ./run.sh"
     echo "========================================================"
     echo ""
 else

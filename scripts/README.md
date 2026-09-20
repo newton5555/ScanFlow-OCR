@@ -53,11 +53,11 @@ bash ./publish-linux-x64.sh --aot
 
 ## 3. 发布交付目录结构
 
-发布成功后产物默认直接输出至仓库根目录的 `publish/` 目录下（已被 `.gitignore` 自动忽略）：
+发布成功后产物按平台分别输出至仓库根目录的 `publish/` 对应平台目录下（已被 `.gitignore` 自动忽略）：
 
-### Windows x64 产物结构 (`F:\Projects\ScanFlow-OCR\publish\`)
+### Windows x64 产物结构 (`F:\Projects\ScanFlow-OCR\publish\win-x64\`)
 ```
-publish/
+publish/win-x64/
 ├── ScanFlowOcr.App.exe       # 主可执行文件（所有托管程序集单文件打包，约 50MB）
 ├── appsettings.json          # 应用配置
 ├── e_sqlite3.dll             # SQLite 原生引擎（输出持久化队列）
@@ -69,15 +69,27 @@ publish/
         └── turbojpeg.dll     # libjpeg-turbo 硬件加速解压库
 ```
 
-### Linux x64 产物结构 (`F:\Projects\ScanFlow-OCR\publish\`)
+### Linux x64 产物结构 (`F:\Projects\ScanFlow-OCR\publish\linux-x64\`)
 ```
-publish/
-├── ScanFlowOcr.App           # Linux ELF 独立可执行程序（需 chmod +x，约 120MB）
+publish/linux-x64/
+├── ScanFlowOcr.App           # Linux ELF 独立可执行程序（自包含，无需安装 .NET）
+├── run.sh                    # 【推荐】一键自赋权启动脚本（内置自动 chmod +x 与 LD_LIBRARY_PATH）
+├── setup-permissions.sh      # 权限初始化脚本（为目录中所有程序、脚本与动态库赋予 755 权限）
 ├── appsettings.json          # 应用配置
 ├── libe_sqlite3.so           # SQLite 原生动态库
 ├── libSkiaSharp.so           # Linux Skia 动态库
 ├── libHarfBuzzSharp.so       # 字体排印动态库
 └── native/
     └── linux-x64/
-        └── libturbojpeg.so   # Linux libjpeg-turbo 动态库
+        └── libturbojpeg.so   # Linux libjpeg-turbo 硬件加速解压库
+```
+
+#### Linux 运行方法：
+```bash
+# 推荐：直接使用启动脚本（会自动赋权并配置动态库路径）
+bash ./run.sh
+
+# 或者：先执行一次全局赋权，再直接运行二进制
+bash ./setup-permissions.sh
+./ScanFlowOcr.App
 ```
