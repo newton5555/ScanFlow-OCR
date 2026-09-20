@@ -62,7 +62,8 @@
             <Grid x:Name="PanelCaptionButtons" Width="138" Height="42" ColumnDefinitions="46,46,46"
                   VerticalAlignment="Center" ClipToBounds="True">
               <Button x:Name="BtnMinimizeWindow" Grid.Column="0" Classes="caption" ToolTip.Tip="最小化" Click="OnMinimizeWindowClick">
-                <Path Data="{StaticResource GeoWindowMinimize}" Width="10" Height="10" Stretch="Uniform" />
+                <Path Data="{StaticResource GeoWindowMinimize}" Width="10" Height="1" Stretch="Fill"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
               </Button>
               <Button x:Name="BtnMaximizeRestoreWindow" Grid.Column="1" Classes="caption" ToolTip.Tip="最大化" Click="OnMaximizeRestoreWindowClick">
                 <Path x:Name="PathMaximizeIcon" Data="{StaticResource GeoWindowMaximize}" Width="10" Height="10" Stretch="Uniform" />
@@ -307,12 +308,10 @@
             </Border>
 
             <!-- Viewport Zoom & Tools Capsule Pill (Bottom-Right) -->
-            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12" Height="28"
-                    Background="{DynamicResource SurfaceBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderSubtleBrush}"
-                    BorderThickness="1" CornerRadius="14" Padding="6,0">
+            <Border Classes="viewport-tools" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12"
+                    Height="30">
               <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
-                <Button x:Name="BtnEditRoi" Classes="ghost" Height="22" Padding="6,0"
+                <Button x:Name="BtnEditRoi" Classes="tool-action" Height="22" Padding="6,0"
                         ToolTip.Tip="在当前画面中框选 OCR 识别区域" Click="OnBeginRoiEdit">
                   <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                     <Path Data="{StaticResource GeoSliders}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.4" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
@@ -320,7 +319,7 @@
                   </StackPanel>
                 </Button>
                 <Border Width="1" Height="14" Background="{DynamicResource BorderSubtleBrush}" Margin="4,0" VerticalAlignment="Center" />
-                <Button x:Name="BtnToggleGuides" Classes="ghost" Height="22" Padding="8,0"
+                <Button x:Name="BtnToggleGuides" Classes="tool-action" Height="22" Padding="8,0"
                         ToolTip.Tip="显示 / 隐藏画面中心十字标尺线" Click="OnToggleGuides">
                   <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                     <Path Data="{StaticResource GeoReticleCrosshair}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2" Width="11" Height="11" Stretch="Uniform" VerticalAlignment="Center" />
@@ -328,11 +327,11 @@
                   </StackPanel>
                 </Button>
                 <Border Width="1" Height="14" Background="{DynamicResource BorderSubtleBrush}" Margin="4,0" VerticalAlignment="Center" />
-                <Button Classes="ghost" Width="22" Height="22" Padding="0" Content="−" Click="OnZoomOut" ToolTip.Tip="缩小画面" />
-                <Button Classes="ghost" Height="22" Padding="6,0" Click="OnZoomReset" ToolTip.Tip="双击视口或点击还原 (1:1 / 适应窗口)">
+                <Button Classes="tool-action tool-zoom" Width="22" Height="22" Padding="0" Content="−" Click="OnZoomOut" ToolTip.Tip="缩小画面" />
+                <Button Classes="tool-action tool-zoom-value" Height="22" Padding="6,0" Click="OnZoomReset" ToolTip.Tip="双击视口或点击还原 (1:1 / 适应窗口)">
                   <TextBlock x:Name="TxtZoomLevel" Text="100%" FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" FontWeight="SemiBold" VerticalAlignment="Center" />
                 </Button>
-                <Button Classes="ghost" Width="22" Height="22" Padding="0" Content="+" Click="OnZoomIn" ToolTip.Tip="放大画面" />
+                <Button Classes="tool-action tool-zoom" Width="22" Height="22" Padding="0" Content="+" Click="OnZoomIn" ToolTip.Tip="放大画面" />
               </StackPanel>
             </Border>
 
@@ -482,59 +481,111 @@
             </TextBox>
           </Grid>
 
-          <!-- Results List + Inspector -->
-          <Grid Grid.Row="2" RowDefinitions="*,110" RowSpacing="8">
-            <Border Grid.Row="0" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" />
-            <ListBox x:Name="ResultsList" SelectionChanged="OnResultSelectionChanged"
-                     Background="Transparent" BorderThickness="0">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="models:ScanResultItem">
-                  <Border Classes="result-item" Margin="2,3" Padding="8,6" Background="Transparent">
-                    <Grid RowDefinitions="Auto,Auto">
-                      <!-- Top row: Badge, Timestamp, Confidence, Copy -->
-                      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,4">
-                        <Border Classes="chip" Background="{DynamicResource SymbologyBadgeOcrBgBrush}" BorderBrush="{DynamicResource SymbologyBadgeOcrBorderBrush}">
-                          <TextBlock Text="OCR" FontSize="11" FontWeight="Bold" Foreground="{DynamicResource SymbologyBadgeOcrTextBrush}" />
-                        </Border>
-                        <TextBlock Grid.Column="1" Text="{Binding Time}" Classes="muted" FontSize="11" Margin="8,0,0,0" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="2" Text="{Binding ConfidenceDisplay}" Classes="muted" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center" />
-                        <Button Grid.Column="3" Classes="ghost" Width="22" Height="20" Padding="0"
-                                ToolTip.Tip="复制此条文本" Tag="{Binding}" Click="OnCopyResultItem">
-                          <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.2" Width="10" Height="10" Stretch="Uniform" />
-                        </Button>
-                      </Grid>
-                      <!-- Text content -->
-                      <TextBlock Grid.Row="1" Text="{Binding Text}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
-                    </Grid>
-                  </Border>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
+          <!-- Results Table + Inspector -->
+          <Grid Grid.Row="2" RowDefinitions="Auto,*,Auto">
+            <Border Grid.Row="0" Classes="results-table-header">
+              <Grid ColumnDefinitions="36,*,64,24" ColumnSpacing="8" Margin="0,0,14,0">
+                <TextBlock Text="类型" Classes="muted" FontSize="10" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="1" Text="识别文本" Classes="muted" FontSize="10" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="置信度" Classes="muted" FontSize="10" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="3" Text="操作" Classes="muted" FontSize="10" FontWeight="SemiBold"
+                           HorizontalAlignment="Right" />
+              </Grid>
+            </Border>
 
-            <!-- Empty Results Placeholder -->
-            <StackPanel x:Name="PanelEmptyResults" Grid.Row="0" HorizontalAlignment="Center"
-                        VerticalAlignment="Center" Spacing="8" IsHitTestVisible="False">
-              <Path Data="{StaticResource GeoSearch}" Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.5" Fill="Transparent"
-                    Width="28" Height="28" Stretch="Uniform" HorizontalAlignment="Center" Opacity="0.5" />
-              <TextBlock Text="等待识别数据" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" />
-              <TextBlock Text="将文字置于相机取景区内，结果将在此实时呈现"
-                         Classes="muted" FontSize="11" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="270" />
-            </StackPanel>
+            <Border Grid.Row="1" Classes="results-table-surface">
+              <Grid>
+                <ListBox x:Name="ResultsList" SelectionChanged="OnResultSelectionChanged"
+                         Background="Transparent" BorderThickness="0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Visible">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="models:ScanResultItem">
+                      <Border Classes="result-row" Padding="8,8">
+                        <Grid ColumnDefinitions="36,*,64,24" ColumnSpacing="8">
+                          <Border Classes="result-kind-chip" Background="{DynamicResource SymbologyBadgeOcrBgBrush}"
+                                  BorderBrush="{DynamicResource SymbologyBadgeOcrBorderBrush}">
+                            <TextBlock Text="OCR" FontSize="10" FontWeight="Bold"
+                                       Foreground="{DynamicResource SymbologyBadgeOcrTextBrush}" />
+                          </Border>
+                          <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Text}" FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Time}" Classes="muted" FontSize="10" />
+                          </StackPanel>
+                          <Border Grid.Column="2" Classes="result-confidence">
+                            <TextBlock Text="{Binding Confidence}" FontSize="10" FontWeight="SemiBold"
+                                       FontFamily="Cascadia Code, Consolas, monospace"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" />
+                          </Border>
+                          <Button Grid.Column="3" Classes="ghost" Width="24" Height="24" Padding="0"
+                                  ToolTip.Tip="复制此条文本" Tag="{Binding}" Click="OnCopyResultItem">
+                            <Path Data="{StaticResource GeoCopy}" Stroke="{DynamicResource TextMutedBrush}"
+                                  StrokeThickness="1.2" Width="11" Height="11" Stretch="Uniform"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                          </Button>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Empty Results Placeholder -->
+                <StackPanel x:Name="PanelEmptyResults" HorizontalAlignment="Center"
+                            VerticalAlignment="Center" Spacing="8" IsHitTestVisible="False">
+                  <Border Classes="empty-results-icon" Width="46" Height="46" HorizontalAlignment="Center">
+                    <Path Data="{StaticResource GeoSearch}" Stroke="{DynamicResource BrandBrush}"
+                          StrokeThickness="1.5" Fill="Transparent" Width="22" Height="22"
+                          Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  </Border>
+                  <TextBlock Text="暂无识别结果" FontSize="12" FontWeight="SemiBold"
+                             HorizontalAlignment="Center" />
+                  <TextBlock Text="启动扫描或导入图片后，识别内容会按时间顺序显示在这里"
+                             Classes="muted" FontSize="11" TextAlignment="Center"
+                             TextWrapping="Wrap" MaxWidth="240" />
+                </StackPanel>
+              </Grid>
+            </Border>
 
             <!-- Details / Inspector Card -->
-            <Border Grid.Row="1" Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
-                    BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="1" CornerRadius="4" Padding="8">
-              <StackPanel Spacing="4">
+            <Border Grid.Row="2" Classes="result-inspector" Padding="12" Margin="0,10,0,0" MaxHeight="230" ClipToBounds="True">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="5">
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="OCR 详情" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-                  <Button x:Name="SelectedResultCopyButton" Grid.Column="1" Classes="outline" Height="24" Content="复制文本"
-                          Click="OnCopySelectedResult" IsEnabled="False" />
+                  <StackPanel Spacing="1">
+                    <TextBlock Text="OCR 详情" FontSize="12" FontWeight="SemiBold" />
+                    <TextBlock Text="当前选中结果" Classes="muted" FontSize="10" />
+                  </StackPanel>
+                  <Button x:Name="SelectedResultCopyButton" Grid.Column="1" Classes="outline" Height="28" Padding="10,0"
+                          Content="复制文本" Click="OnCopySelectedResult" IsEnabled="False" />
                 </Grid>
-                <TextBlock x:Name="TxtInspectorText" Text="选择一条结果查看详情" TextWrapping="Wrap" FontSize="12" />
-                <TextBlock x:Name="TxtInspectorMeta" Classes="muted" TextWrapping="Wrap" FontSize="11"
-                           FontFamily="Cascadia Code, Consolas, monospace" />
+                <Border Classes="result-inspector-value" Padding="8,5">
+                  <ScrollViewer MaxHeight="80" VerticalScrollBarVisibility="Auto">
+                    <SelectableTextBlock x:Name="TxtInspectorText" Text="选择一条结果查看详情"
+                                         TextWrapping="Wrap" FontSize="13" />
+                  </ScrollViewer>
+                </Border>
+                <Grid x:Name="InspectorMetadataPanel" ColumnDefinitions="Auto,*,Auto,*"
+                      RowDefinitions="Auto,Auto,Auto" ColumnSpacing="7" RowSpacing="2" IsVisible="False">
+                  <TextBlock Classes="inspector-label" Text="时间" />
+                  <TextBlock x:Name="TxtInspectorTime" Grid.Column="1" Classes="inspector-value-text" />
+                  <TextBlock Grid.Column="2" Classes="inspector-label" Text="置信度" />
+                  <TextBlock x:Name="TxtInspectorConfidence" Grid.Column="3" Classes="inspector-value-text" />
+
+                  <TextBlock Grid.Row="1" Classes="inspector-label" Text="位置" />
+                  <TextBlock x:Name="TxtInspectorBounds" Grid.Row="1" Grid.Column="1"
+                             Classes="inspector-value-text" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Row="1" Grid.Column="2" Classes="inspector-label" Text="来源" />
+                  <TextBlock x:Name="TxtInspectorSource" Grid.Row="1" Grid.Column="3"
+                             Classes="inspector-value-text" TextTrimming="CharacterEllipsis" />
+
+                  <TextBlock Grid.Row="2" Classes="inspector-label" Text="事件" />
+                  <TextBlock x:Name="TxtInspectorEventId" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
+                             Classes="inspector-value-text" TextTrimming="CharacterEllipsis" />
+                </Grid>
               </StackPanel>
+              </ScrollViewer>
             </Border>
           </Grid>
         </Grid>
@@ -567,7 +618,7 @@
                   <TextBlock Text="复制" FontSize="11" Classes="muted" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
-              <Button Classes="danger-soft" Height="24" Padding="6,2" Click="OnClearLog" ToolTip.Tip="清空运行日志">
+              <Button Classes="log-clear" Height="24" Padding="6,2" Click="OnClearLog" ToolTip.Tip="清空运行日志">
                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                   <Path Data="{StaticResource GeoTrash}" Fill="{DynamicResource DangerTextBrush}" Width="10" Height="10" Stretch="Uniform" VerticalAlignment="Center" />
                   <TextBlock Text="清空" FontSize="11" Foreground="{DynamicResource DangerTextBrush}" VerticalAlignment="Center" />
@@ -583,11 +634,11 @@
 
         <!-- Drawer Body Tray (Only log display) -->
         <Border Grid.Row="1" x:Name="LogDrawerBody" IsVisible="False" Height="120"
-                Background="{DynamicResource SurfaceBackgroundBrush}"
+                Background="{DynamicResource SurfaceSubtleBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderSubtleBrush}" BorderThickness="0,1,0,0">
-          <TextBox x:Name="Log" AcceptsReturn="True" IsReadOnly="True" TextWrapping="Wrap"
-                   FontFamily="Cascadia Code, Consolas, monospace" FontSize="11"
-                   BorderThickness="0" Background="Transparent" Padding="12,6" />
+          <TextBox x:Name="Log" Classes="log-viewer" AcceptsReturn="True" IsReadOnly="True"
+                   TextWrapping="NoWrap" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto" />
         </Border>
       </Grid>
     </Border>

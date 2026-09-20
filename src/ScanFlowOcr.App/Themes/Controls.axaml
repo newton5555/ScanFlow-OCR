@@ -79,9 +79,79 @@
     <Setter Property="Background" Value="{DynamicResource SurfaceHoverBackgroundBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource BrandBorderBrush}" />
   </Style>
+  <Style Selector="Border.results-table-header">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="1,1,1,0" />
+    <Setter Property="CornerRadius" Value="4,4,0,0" />
+    <Setter Property="Padding" Value="8,5" />
+  </Style>
+  <Style Selector="Border.results-table-surface">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="0,0,4,4" />
+  </Style>
+  <Style Selector="Border.result-row">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="CornerRadius" Value="0" />
+  </Style>
+  <Style Selector="Border.result-row:pointerover">
+    <Setter Property="Background" Value="{DynamicResource SurfaceHoverBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BrandBorderBrush}" />
+  </Style>
+  <Style Selector="ListBoxItem:selected Border.result-row">
+    <Setter Property="Background" Value="{DynamicResource BrandSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BrandBorderBrush}" />
+  </Style>
+  <Style Selector="Border.result-kind-chip">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusXs}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="5,2" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.result-confidence">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusXs}" />
+    <Setter Property="Padding" Value="5,2" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.empty-results-icon">
+    <Setter Property="Background" Value="{DynamicResource BrandSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BrandBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="23" />
+  </Style>
+  <Style Selector="Border.result-inspector">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+  <Style Selector="Border.result-inspector-value">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusXs}" />
+  </Style>
+  <Style Selector="TextBlock.inspector-label">
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="FontSize" Value="10" />
+  </Style>
+  <Style Selector="TextBlock.inspector-value-text">
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="FontFamily" Value="Cascadia Code, Consolas, monospace" />
+    <Setter Property="FontSize" Value="10" />
+  </Style>
 
   <!-- ==================== BUTTONS ==================== -->
   <Style Selector="Button">
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="MinWidth" Value="0" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
@@ -126,7 +196,10 @@
     <Setter Property="Background" Value="{DynamicResource BorderMediumBrush}" />
   </Style>
   <Style Selector="Button.outline:disabled /template/ ContentPresenter#PART_ContentPresenter">
-    <Setter Property="Opacity" Value="0.4" />
+    <Setter Property="Opacity" Value="1" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
   </Style>
 
   <Style Selector="Button.ghost">
@@ -139,6 +212,57 @@
   <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource SurfaceHoverBackgroundBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <!-- Borderless destructive action used by the log drawer. -->
+  <Style Selector="Button.log-clear">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}" />
+    <Setter Property="Padding" Value="6,2" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
+  </Style>
+  <Style Selector="Button.log-clear:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DangerBgBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource DangerTextBrush}" />
+  </Style>
+
+  <!-- Viewport actions share one compact, borderless tool-strip language. -->
+  <Style Selector="Border.viewport-tools">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="Padding" Value="4,0" />
+  </Style>
+  <Style Selector="Button.tool-action">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusXs}" />
+    <Setter Property="FontSize" Value="11" />
+  </Style>
+  <Style Selector="Button.tool-action:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceHoverBackgroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="Button.tool-action:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource BrandSoftBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource BrandBrush}" />
+  </Style>
+  <Style Selector="Button.tool-action Path">
+    <Setter Property="Opacity" Value="0.9" />
+  </Style>
+  <Style Selector="Button.tool-action:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+  <Style Selector="Button.tool-zoom-value">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontFamily" Value="Cascadia Code, Consolas, monospace" />
   </Style>
 
   <Style Selector="Button.danger">
@@ -302,8 +426,24 @@
   <Style Selector="TextBox:focus">
     <Setter Property="BorderBrush" Value="{DynamicResource BorderFocusBrush}" />
   </Style>
+  <Style Selector="TextBox.log-viewer">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    <Setter Property="FontFamily" Value="Cascadia Code, Consolas, monospace" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+  <Style Selector="TextBox.log-viewer:focus">
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
 
   <Style Selector="ComboBox">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
     <Setter Property="BorderBrush" Value="{DynamicResource BorderSubtleBrush}" />
@@ -333,8 +473,9 @@
     <Setter Property="BorderThickness" Value="0" />
   </Style>
   <Style Selector="ListBoxItem">
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="Padding" Value="0" />
-    <Setter Property="Margin" Value="0,2" />
+    <Setter Property="Margin" Value="0" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusSm}" />
     <Setter Property="Background" Value="Transparent" />
@@ -349,7 +490,7 @@
   <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource BrandSoftBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource BrandBrush}" />
-    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderThickness" Value="0" />
   </Style>
 
   <!-- ==================== TAB CONTROL ==================== -->

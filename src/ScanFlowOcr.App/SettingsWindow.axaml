@@ -104,11 +104,11 @@
                     <ToggleSwitch Grid.Column="1" x:Name="ChkPreviewEnabled" IsChecked="True" ToolTip.Tip="开启或关闭连续扫描时的画面预览" />
                   </Grid>
                   <TextBlock Text="控制连续扫描时的 UI 预览帧率与最大画布限制，关闭预览可最大化降低渲染开销" Classes="muted" />
-                  <Grid ColumnDefinitions="140,*,140,*" RowDefinitions="Auto" ColumnSpacing="12" Margin="0,4,0,0">
+                  <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="12" Margin="0,4,0,0">
                     <TextBlock VerticalAlignment="Center" Classes="muted" Text="取景帧率上限 (FPS)" />
                     <TextBox x:Name="PreviewFpsBox" Grid.Column="1" Text="15" Height="30" />
-                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Classes="muted" Text="最大 W × H (0=不限制)" />
-                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+                    <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="最大 W × H (0=不限制)" />
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="6">
                       <TextBox x:Name="PreviewMaxWBox" Width="70" Text="0" Height="30" />
                       <TextBlock Text="×" VerticalAlignment="Center" Classes="muted" />
                       <TextBox x:Name="PreviewMaxHBox" Width="70" Text="0" Height="30" />
@@ -350,31 +350,31 @@
                   <TextBlock Text="向 MQTT 消息代理服务器推送 OCR 识别结果 JSON 载荷" Classes="muted" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
                     <TextBlock VerticalAlignment="Center" Classes="muted" Text="Broker 地址与端口" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                      <TextBox x:Name="MqttBrokerBox" Width="260" Text="localhost" Height="30" />
-                      <TextBlock Text=":" VerticalAlignment="Center" Classes="muted" />
-                      <TextBox x:Name="MqttPortBox" Width="80" Text="1883" Height="30" />
-                    </StackPanel>
+                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto,80" ColumnSpacing="8">
+                      <TextBox x:Name="MqttBrokerBox" Text="localhost" Height="30" />
+                      <TextBlock Grid.Column="1" Text=":" VerticalAlignment="Center" Classes="muted" />
+                      <TextBox x:Name="MqttPortBox" Grid.Column="2" Text="1883" Height="30" />
+                    </Grid>
 
                     <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="发布主题 (Topic)" />
                     <TextBox x:Name="MqttTopicBox" Grid.Row="1" Grid.Column="1" Text="scanflow-ocr/scans" Height="30" />
 
                     <TextBlock Grid.Row="2" VerticalAlignment="Center" Classes="muted" Text="客户端 ID / QoS" />
-                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                      <TextBox x:Name="MqttClientIdBox" Width="240" Height="30" />
-                      <ComboBox x:Name="MqttQosCombo" Width="130" Height="30">
+                    <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,140" ColumnSpacing="8">
+                      <TextBox x:Name="MqttClientIdBox" Height="30" />
+                      <ComboBox x:Name="MqttQosCombo" Grid.Column="1" HorizontalAlignment="Stretch" Height="30">
                         <ComboBoxItem Content="QoS 0 · 至多一次" Tag="0" />
                         <ComboBoxItem Content="QoS 1 · 至少一次" Tag="1" />
                         <ComboBoxItem Content="QoS 2 · 恰好一次" Tag="2" />
                       </ComboBox>
-                    </StackPanel>
+                    </Grid>
 
                     <TextBlock Grid.Row="3" VerticalAlignment="Center" Classes="muted" Text="认证用户名" />
                     <TextBox x:Name="MqttUsernameBox" Grid.Row="3" Grid.Column="1" Height="30" />
 
                     <TextBlock Grid.Row="4" VerticalAlignment="Center" Classes="muted" Text="认证密码" />
-                    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="10">
-                      <TextBox x:Name="MqttPasswordBox" Width="240" PasswordChar="●" PlaceholderText="留空则保持原密码" Height="30" />
+                    <StackPanel Grid.Row="4" Grid.Column="1" Spacing="6">
+                      <TextBox x:Name="MqttPasswordBox" PasswordChar="●" PlaceholderText="留空则保持原密码" Height="30" />
                       <CheckBox x:Name="ClearMqttPasswordBox" Content="清除已保存密码" VerticalAlignment="Center" />
                     </StackPanel>
 
@@ -397,11 +397,11 @@
                   <TextBlock Text="建立裸 TCP 套接字连接并实时流式推送换行分隔的结果数据" Classes="muted" />
                   <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
                     <TextBlock VerticalAlignment="Center" Classes="muted" Text="主机地址与端口" />
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                      <TextBox x:Name="TcpHostBox" Width="260" Text="127.0.0.1" Height="30" />
-                      <TextBlock Text=":" VerticalAlignment="Center" Classes="muted" />
-                      <TextBox x:Name="TcpPortBox" Width="80" Text="9100" Height="30" />
-                    </StackPanel>
+                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto,80" ColumnSpacing="8">
+                      <TextBox x:Name="TcpHostBox" Text="127.0.0.1" Height="30" />
+                      <TextBlock Grid.Column="1" Text=":" VerticalAlignment="Center" Classes="muted" />
+                      <TextBox x:Name="TcpPortBox" Grid.Column="2" Text="9100" Height="30" />
+                    </Grid>
 
                     <TextBlock Grid.Row="1" VerticalAlignment="Center" Classes="muted" Text="安全连接 (TLS)" />
                     <ToggleSwitch x:Name="TcpTlsBox" Grid.Row="1" Grid.Column="1" ToolTip.Tip="启用 TLS 加密连接" />

@@ -640,7 +640,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         ResultsList.SelectedItem = null;
         SyncFrameAnnotations();
         TxtInspectorText.Text = "选择一条结果查看详情";
-        TxtInspectorMeta.Text = "";
+        ClearInspectorMetadata();
         SelectedResultCopyButton.IsEnabled = false;
         Log.Text = "";
         _logLinesCount = 0;
@@ -1404,13 +1404,28 @@ public partial class MainWindow : Window, IAsyncDisposable
         if (ResultsList.SelectedItem is not ScanResultItem item)
         {
             TxtInspectorText.Text = "选择一条结果查看详情";
-            TxtInspectorMeta.Text = "";
+            ClearInspectorMetadata();
             SelectedResultCopyButton.IsEnabled = false;
             return;
         }
         SelectedResultCopyButton.IsEnabled = !string.IsNullOrWhiteSpace(item.Text);
         TxtInspectorText.Text = item.Text;
-        TxtInspectorMeta.Text = $"{item.Time}  {item.ConfidenceDisplay}\n{item.BoundsSummary}\nEventId={item.EventId:N}\nSource={item.SourceId}";
+        InspectorMetadataPanel.IsVisible = true;
+        TxtInspectorTime.Text = item.Time;
+        TxtInspectorConfidence.Text = item.Confidence;
+        TxtInspectorBounds.Text = item.BoundsSummary;
+        TxtInspectorSource.Text = item.SourceId;
+        TxtInspectorEventId.Text = item.EventId.ToString("N");
+    }
+
+    private void ClearInspectorMetadata()
+    {
+        InspectorMetadataPanel.IsVisible = false;
+        TxtInspectorTime.Text = "";
+        TxtInspectorConfidence.Text = "";
+        TxtInspectorBounds.Text = "";
+        TxtInspectorSource.Text = "";
+        TxtInspectorEventId.Text = "";
     }
 
     private async void OnCopySelectedResult(object? sender, RoutedEventArgs e)
