@@ -175,8 +175,8 @@ Check(SimdPaddleOcrMetadata.ProviderId == "SimdPaddle", "provider id");
 Check(MqttRoute.Default.Validate() is null, "mqtt default route ok");
 Check(new MqttRoute("bad host", 1883, false, "id", "t", 1, null, null).Validate() is not null, "mqtt rejects whitespace broker");
 Check(new MqttRoute("localhost", 1883, false, "id", "a/+/b", 1, null, null).Validate() is not null, "mqtt rejects wildcard topic");
-Check(new TcpRoute("127.0.0.1", 9100, false).Validate() is null, "tcp route ok");
-Check(new TcpRoute("host", 0, false).Validate() is not null, "tcp rejects bad port");
+Check(new TcpRoute("127.0.0.1", 9100).Validate() is null, "tcp route ok");
+Check(new TcpRoute("host", 0).Validate() is not null, "tcp rejects bad port");
 
 {
     string dir = Path.Combine(Path.GetTempPath(), "scanflow-ocr-smoke-" + Guid.NewGuid().ToString("N"));
@@ -188,7 +188,7 @@ Check(new TcpRoute("host", 0, false).Validate() is not null, "tcp rejects bad po
     coordinator.Configure([]);
     Check(!coordinator.GetStatus().Enabled, "coordinator disabled");
 
-    var tcp = new TcpRoute("127.0.0.1", 9, false);
+    var tcp = new TcpRoute("127.0.0.1", 9);
     coordinator.Configure([new OutputRouteProfile("tcp", true, 10, 1024 * 1024,
         System.Text.Json.JsonSerializer.SerializeToElement(tcp))]);
     Check(coordinator.GetStatus().Routes[0].SinkId == "tcp", "coordinator tcp route");

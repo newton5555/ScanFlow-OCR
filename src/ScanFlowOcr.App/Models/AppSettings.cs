@@ -51,7 +51,6 @@ public sealed class AppSettings
     public bool TcpEnabled { get; set; }
     public string TcpHost { get; set; } = "127.0.0.1";
     public int TcpPort { get; set; } = 9100;
-    public bool TcpTls { get; set; }
     public bool KeyboardEnabled { get; set; }
     public string KeyboardTargetProcess { get; set; } = OperatingSystem.IsLinux() ? "gedit" : "notepad.exe";
     public KeyboardSuffix KeyboardSuffix { get; set; } = KeyboardSuffix.Enter;
@@ -88,7 +87,7 @@ public sealed class AppSettings
                 JsonSerializer.SerializeToElement(ToMqttRoute())));
         else if (TcpEnabled)
             routes.Add(new("tcp", true, OutputQueueCapacity, 1024 * 1024,
-                JsonSerializer.SerializeToElement(new TcpRoute(TcpHost, TcpPort, TcpTls))));
+                JsonSerializer.SerializeToElement(new TcpRoute(TcpHost, TcpPort))));
         else if (KeyboardEnabled)
             routes.Add(new("keyboard", true, OutputQueueCapacity, 8 * 1024,
                 JsonSerializer.SerializeToElement(new KeyboardRoute(
@@ -133,7 +132,6 @@ public sealed class AppSettings
         TcpEnabled = TcpEnabled,
         TcpHost = TcpHost,
         TcpPort = TcpPort,
-        TcpTls = TcpTls,
         KeyboardEnabled = KeyboardEnabled,
         KeyboardTargetProcess = KeyboardTargetProcess,
         KeyboardSuffix = KeyboardSuffix,
@@ -172,7 +170,7 @@ public sealed class AppSettings
         }
         if (TcpEnabled)
         {
-            error = new TcpRoute(TcpHost, TcpPort, TcpTls).Validate();
+            error = new TcpRoute(TcpHost, TcpPort).Validate();
             if (error != null) return false;
         }
         if (KeyboardEnabled)

@@ -468,7 +468,7 @@
                     <TextBlock Text="TCP 客户端配置" Classes="settings-section-title" />
                   </StackPanel>
                   <TextBlock Text="建立裸 TCP 套接字连接并实时流式推送换行分隔的结果数据" Classes="settings-description" />
-                  <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
+                  <Grid ColumnDefinitions="140,*" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="8" Margin="0,4,0,0">
                     <TextBlock Classes="settings-label" Text="主机地址与端口" />
                     <Grid Grid.Column="1" ColumnDefinitions="*,Auto,80" ColumnSpacing="8">
                       <TextBox x:Name="TcpHostBox" Classes="settings-input" Text="127.0.0.1" />
@@ -476,8 +476,6 @@
                       <TextBox x:Name="TcpPortBox" Classes="settings-input" Grid.Column="2" Text="9100" />
                     </Grid>
 
-                    <TextBlock Grid.Row="1" Classes="settings-label" Text="安全连接 (TLS)" />
-                    <ToggleSwitch x:Name="TcpTlsBox" Grid.Row="1" Grid.Column="1" ToolTip.Tip="启用 TLS 加密连接" />
                   </Grid>
                 </StackPanel>
               </Border>

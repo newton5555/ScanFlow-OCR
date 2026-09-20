@@ -139,7 +139,6 @@ public partial class SettingsWindow : Window
         MqttTlsBox.IsChecked = _draft.MqttTls;
         TcpHostBox.Text = _draft.TcpHost;
         TcpPortBox.Text = _draft.TcpPort.ToString(CultureInfo.InvariantCulture);
-        TcpTlsBox.IsChecked = _draft.TcpTls;
         QueueCapacityBox.Text = _draft.OutputQueueCapacity.ToString(CultureInfo.InvariantCulture);
         UpdateConditionalSections();
     }
@@ -324,7 +323,6 @@ public partial class SettingsWindow : Window
             _draft.MqttProtectedPassword = MqttRoute.ProtectPassword(MqttPasswordBox.Text);
         _draft.TcpHost = TcpHostBox.Text?.Trim() ?? "127.0.0.1";
         _draft.TcpPort = ParseInt(TcpPortBox.Text, 9100);
-        _draft.TcpTls = TcpTlsBox.IsChecked == true;
         _draft.OutputQueueCapacity = ParseInt(QueueCapacityBox.Text, 1000);
     }
 
