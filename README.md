@@ -1,114 +1,83 @@
 # ScanFlow-OCR
 
-Cross-platform desktop OCR (Windows / Linux x64) built with Avalonia.
+跨平台 **单 OCR** 桌面应用（Windows / Linux x64），基于 Avalonia。
 
-Extracted from the OCR path of private ScanFlow (barcode / DecodeP1 / Phenix / CoreHost / NativeLoading / WPF Desktop removed).
+面向连续相机识别与静态图识别：ROI、去重会话、结果列表，以及键盘 / MQTT / TCP 输出。本仓库 **只做 OCR**，不含条码解码或其他业务栈。
 
-## Phase 1 scope
+## 依赖
 
-| Area | Choice |
-|------|--------|
-| UI | Avalonia (Win + Linux x64) |
-| Camera | Vendored FlashCap — Windows Media Foundation first with legacy backend fallback, Linux V4L2; MJPEG-first |
-| Still images | StbImageSharp + BitMiracle.LibTiff.NET (not TurboJPEG) |
-| Camera JPEG | TurboJPEG **3.2.0** via `native/{win-x64\|linux-x64}/` (or `SCANFLOW_OCR_TURBOJPEG_PATH`) |
-| OCR | In-process Sdcb.SimdPaddleOCR Chinese V6 Tiny (Small optional) |
-| Keyboard | Windows `SendInput`; Linux self-wrapped `/dev/uinput` (ASCII phase 1) |
-| Outputs | MQTT (MQTTnet), TCP client (optional TLS), keyboard — durable SQLite queue via `OutputCoordinator` |
-| License | Apache-2.0 |
+### 构建与运行时
 
-## Deferred
+| 依赖 | 说明 |
+|------|------|
+| **.NET SDK 10** | 见 `global.json`（当前 `10.0.100`，`rollForward: latestFeature`） |
+| **Avalonia 12.1.2** | UI（`Avalonia` / `Desktop` / `Fluent` / `Fonts.Inter`） |
+| **Sdcb.SimdPaddleOCR** | 进程内中文 OCR；模型包 Tiny（默认）/ Small（可选） |
+| **FlashCap**（仓库内 vendor） | 相机采集：Windows 优先 Media Foundation，可回退 DirectShow/VFW；Linux V4L2；MJPEG 优先 |
+| **libjpeg-turbo 3.2.0（TurboJPEG）** | 相机 MJPEG 预览与帧 OCR；随仓库 `native/win-x64`、`native/linux-x64` 提供 |
+| **StbImageSharp** + **BitMiracle.LibTiff.NET** | 静态图解码（不依赖 TurboJPEG） |
+| **MQTTnet** | MQTT 输出 |
+| **Microsoft.Data.Sqlite** | 输出队列持久化 |
+| **Serilog** | 日志 |
 
-Separate OcrHost process, clipboard auto-output, AOT packing.
+第三方许可摘要见 `THIRD-PARTY-NOTICES.md`。TurboJPEG 来源与校验见 `native/ORIGIN.md`。
 
-## Build
+### 可选环境变量
 
-Requires .NET SDK 10 (`global.json`).
+| 变量 | 作用 |
+|------|------|
+| `SCANFLOW_OCR_TURBOJPEG_PATH` | 覆盖 TurboJPEG 原生库路径 |
+| `SCANFLOW_OCR_CAMERA_BACKEND` | Windows 强制后端：`mediafoundation` / `directshow` / `vfw` |
+
+### 平台注意
+
+- **Windows**：相机需能提供 MJPEG（或可回退后端）；键盘输出使用 `SendInput`。
+- **Linux**：预览需访问 `/dev/video*`；键盘输出需 `/dev/uinput` 写权限（Phase 1 仅 ASCII + Tab/Enter）。
+
+## 构建与运行
 
 ```bash
 dotnet build ScanFlowOcr.slnx
 dotnet run --project tests/ScanFlowOcr.SmokeTests
-dotnet run --project tests/ScanFlowOcr.SmokeTests -- --camera  # optional Windows MJPEG/backend probe
 dotnet run --project src/ScanFlowOcr.App
 ```
 
-Windows folder publish (keeps TurboJPEG beside the app):
+可选相机探测（Windows）：
+
+```bash
+dotnet run --project tests/ScanFlowOcr.SmokeTests -- --camera
+```
+
+发布（示例，TurboJPEG 会随 App 构建拷到输出目录）：
 
 ```powershell
 dotnet publish src/ScanFlowOcr.App -c Release -r win-x64 --self-contained false -o publish/win-x64
 ```
 
-Build succeeds on Linux **without** a camera attached. Live preview needs `/dev/video*` (Linux) or a Windows camera exposing an MJPEG mode plus the TurboJPEG native libs (copied to output on App build).
+无相机时也可在 Linux 上完成构建与 smoke；真机预览需要摄像头与对应原生库。
 
-### Native TurboJPEG (3.2.0 official binaries)
-
-Shipped under:
-
-- `native/win-x64/turbojpeg.dll`
-- `native/linux-x64/libturbojpeg.so`
-
-Source packages (SHA-256 and extraction notes in `native/ORIGIN.md`):
-
-- Windows VC x64: https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-3.2.0-vc-x64.exe
-- Linux amd64 deb: https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-official_3.2.0_amd64.deb
-
-`ScanFlowOcr.App` copies these into `$(OutputDir)/native/{rid}/` on build. Override with `SCANFLOW_OCR_TURBOJPEG_PATH` if needed.
-
-Still-image decode does **not** need TurboJPEG. Camera MJPEG preview / frame OCR does.
-
-License: IJG + Modified BSD — see `THIRD-PARTY-NOTICES.md`. This software is based in part on the work of the Independent JPEG Group.
-
-### Linux keyboard
-
-`/dev/uinput` write permission required. Phase 1 types ASCII (+ Tab/Enter) only; non-ASCII returns `UnicodeUnsupported`.
-
-### Linux camera
-
-FlashCap `CaptureDevices` selects V4L2. Process needs access to `/dev/video*`. App UI: refresh devices → pick MJPEG mode → **启动扫描** (continuous OCR session) or **仅预览** → optional OCR current frame.
-
-### Windows camera
-
-The provider prefers Media Foundation. If it exposes no MJPEG device, enumeration falls back to FlashCap's legacy Windows backend set (DirectShow / Video for Windows), which matches the older WPF behavior. To force a backend while diagnosing a driver, set `SCANFLOW_OCR_CAMERA_BACKEND=mediafoundation`, `directshow`, or `vfw` (`videoforwindows`) before starting the app.
-
-### MQTT / TCP outputs
-
-`ScanFlowOcr.Outputs` provides:
-
-- `MqttRoute` / `MqttOutputSink` — broker, port, TLS, client id, topic, QoS 0–2, optional username/password
-- `TcpRoute` / `TcpOutputSink` — host, port, optional TLS; one UTF-8 JSON line per record (LF-terminated)
-- `OutputCoordinator` — single-sink durable queue (SQLite under `%LOCALAPPDATA%/ScanFlowOcr` or `~/.local/share/ScanFlowOcr`)
-
-Payloads are OCR-only JSON (`textLines`); no barcode fields. MQTT passwords use Windows DPAPI when available; on Linux the protected field stores plaintext.
-
-## Layout
-
-Matches `ScanFlowOcr.slnx`:
+## 仓库结构
 
 ```
 src/ScanFlowOcr.Contracts
 src/ScanFlowOcr.Imaging
-src/ScanFlowOcr.Capture.FlashCap (+ vendor/FlashCap)
+src/ScanFlowOcr.Capture.FlashCap   # + vendor/FlashCap
 src/ScanFlowOcr.Ocr.SimdPaddle
 src/ScanFlowOcr.Outputs
-src/ScanFlowOcr.Runtime      # OCR-only ScanSession (dedupe + ROI crop)
-src/ScanFlowOcr.App          # Avalonia UI, settings, continuous scan
+src/ScanFlowOcr.Runtime            # OCR ScanSession（去重、ROI）
+src/ScanFlowOcr.App                # Avalonia UI、设置、连续扫描
 tests/ScanFlowOcr.SmokeTests
-native/win-x64 native/linux-x64  (+ ORIGIN.md)
-docs/LOCAL-AGENT-HANDOFF.md  # handoff for Windows local agent
+native/win-x64
+native/linux-x64
+docs/MEMORY-OPTIMIZATION.md        # 内存相关说明（可选阅读）
 ```
 
-## Status
+## 功能概览
 
-Phase 1 source migration is in the tree and **builds on Linux** with .NET SDK 10:
+- 设置持久化、连续 OCR 会话、ROI、预览缩放/准星
+- 结果搜索与详情、图库缩略图、静态图 OCR
+- 仅预览 + 单帧 OCR；MQTT / TCP / 键盘输出（OCR JSON，`textLines`）
 
-- Avalonia packages pinned to **12.1.2**
-- Official **libjpeg-turbo 3.2.0** TurboJPEG libs under `native/`
-- `dotnet build ScanFlowOcr.slnx -c Release` — Contracts, Imaging, Capture.FlashCap (+ vendor), Ocr.SimdPaddle, Outputs, App, SmokeTests
-- `dotnet run --project tests/ScanFlowOcr.SmokeTests` — lease / still-JPEG / keyboard+MQTT+TCP route / coordinator configure / SimdPaddle metadata checks pass
-- Avalonia App: **settings persistence**; **continuous OCR scan session** (Runtime); **ROI overlay**; preview zoom/crosshair; results search/inspector; playlist thumbnails; still-image OCR; optional preview-only + frame OCR; MQTT/TCP/keyboard sinks
+## 许可
 
-### Stubbed / deferred
-
-- Linux keyboard: ASCII (+ Tab/Enter) via `/dev/uinput`; non-ASCII returns `UnicodeUnsupported`
-- No OcrHost, clipboard, or AOT packing
-- Playlist-as-session-source and installers — see `docs/LOCAL-AGENT-HANDOFF.md`
+Apache-2.0 — 见 `LICENSE`。

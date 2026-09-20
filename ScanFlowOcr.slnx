@@ -9,7 +9,7 @@
     <File Path="THIRD-PARTY-NOTICES.md" />
   </Folder>
   <Folder Name="/docs/">
-    <File Path="docs/LOCAL-AGENT-HANDOFF.md" />
+    <File Path="docs/MEMORY-OPTIMIZATION.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/ScanFlowOcr.Contracts/ScanFlowOcr.Contracts.csproj" />
