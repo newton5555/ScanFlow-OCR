@@ -62,9 +62,7 @@
             <Grid x:Name="PanelCaptionButtons" Width="138" Height="42" ColumnDefinitions="46,46,46"
                   VerticalAlignment="Center" ClipToBounds="True">
               <Button x:Name="BtnMinimizeWindow" Grid.Column="0" Classes="caption" ToolTip.Tip="最小化" Click="OnMinimizeWindowClick">
-                <Path Data="{StaticResource GeoWindowMinimize}" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2"
-                      Width="10" Height="10" Stretch="Uniform"
-                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Path Data="{StaticResource GeoWindowMinimize}" Width="10" Height="10" Stretch="Uniform" />
               </Button>
               <Button x:Name="BtnMaximizeRestoreWindow" Grid.Column="1" Classes="caption" ToolTip.Tip="最大化" Click="OnMaximizeRestoreWindowClick">
                 <Path x:Name="PathMaximizeIcon" Data="{StaticResource GeoWindowMaximize}" Width="10" Height="10" Stretch="Uniform" />
