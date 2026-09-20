@@ -359,17 +359,28 @@ public partial class SettingsWindow : Window
         if (_coordinator is null) return;
         var dialog = new Window
         {
-            Title = title, Width = 420, Height = 170, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Title = title,
+            Width = 400,
+            CanResize = false,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = new StackPanel
             {
-                Margin = new Thickness(16), Spacing = 12,
+                Margin = new Thickness(20, 18),
+                Spacing = 16,
                 Children =
                 {
                     new TextBlock { Text = warning, TextWrapping = TextWrapping.Wrap },
                     new StackPanel
                     {
-                        Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8,
-                        Children = { new Button { Content = "取消", IsCancel = true }, new Button { Content = "确认", IsDefault = true } }
+                        Orientation = Orientation.Horizontal,
+                        HorizontalAlignment = HorizontalAlignment.Right,
+                        Spacing = 8,
+                        Children =
+                        {
+                            new Button { Content = "取消", IsCancel = true, MinWidth = 64, Height = 28 },
+                            new Button { Content = "确认", IsDefault = true, MinWidth = 64, Height = 28 }
+                        }
                     }
                 }
             }

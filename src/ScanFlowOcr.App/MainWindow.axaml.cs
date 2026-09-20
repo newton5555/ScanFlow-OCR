@@ -308,8 +308,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             Title = "待发送记录",
             Width = 380,
-            Height = 160,
             CanResize = false,
+            SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
         var panel = new StackPanel { Margin = new Thickness(20), Spacing = 14 };
@@ -1591,15 +1591,12 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             Title = "确认清空发送队列",
             Width = 390,
-            Height = 150,
-            MinWidth = 390,
-            MinHeight = 150,
-            MaxWidth = 390,
-            MaxHeight = 150,
+            CanResize = false,
+            SizeToContent = SizeToContent.Height,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             Content = new StackPanel
             {
-                Margin = new Thickness(18),
+                Margin = new Thickness(20, 18),
                 Spacing = 16,
                 Children =
                 {
@@ -1611,8 +1608,8 @@ public partial class MainWindow : Window, IAsyncDisposable
                         Spacing = 8,
                         Children =
                         {
-                            new Button { Content = "取消", IsCancel = true },
-                            new Button { Content = "清空", IsDefault = true, Tag = "confirm" }
+                            new Button { Content = "取消", IsCancel = true, MinWidth = 64, Height = 28 },
+                            new Button { Content = "清空", IsDefault = true, Classes = { "danger" }, Tag = "confirm", MinWidth = 64, Height = 28 }
                         }
                     }
                 }
