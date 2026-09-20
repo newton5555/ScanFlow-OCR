@@ -33,6 +33,20 @@ if (args.Contains("--keyboard-live", StringComparer.Ordinal))
 
 Console.WriteLine("=== ScanFlow-OCR smoke ===");
 
+// DET quad reading axis (geometry + optional CLS 180 flip)
+{
+    var horiz = new Quad(new(0, 0), new(100, 0), new(100, 20), new(0, 20));
+    Check(Math.Abs(QuadReadingAxis.Degrees(horiz) - 0) < 0.01, "quad reading axis horizontal");
+    Check(Math.Abs(QuadReadingAxis.Degrees(horiz, 180) - 180) < 0.01 || Math.Abs(QuadReadingAxis.Degrees(horiz, 180) + 180) < 0.01,
+        "quad reading axis horizontal + CLS 180");
+    var vert = new Quad(new(0, 0), new(20, 0), new(20, 100), new(0, 100));
+    double vertDeg = QuadReadingAxis.Degrees(vert);
+    Check(Math.Abs(vertDeg - 90) < 0.01, "quad reading axis vertical ~90");
+    var c = QuadReadingAxis.Center(horiz);
+    Check(Math.Abs(c.X - 50) < 0.01 && Math.Abs(c.Y - 10) < 0.01, "quad center");
+}
+
+
 var stamp = new FrameStamp(new FrameId(Guid.NewGuid(), 1), "test", 64, 64, Stopwatch.GetTimestamp(), null);
 var allocator = new ImageAllocator(10_000);
 using (var lease = allocator.Allocate(stamp, JpegDecoder.GrayLayout(64, 64), 4096, ImageTransform.Identity))

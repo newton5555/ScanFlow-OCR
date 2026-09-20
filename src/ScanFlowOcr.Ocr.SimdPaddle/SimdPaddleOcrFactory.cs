@@ -204,12 +204,14 @@ public sealed class SimdPaddleOcrFactory : IOcrReaderFactory
                 double? confidence = MapConfidence(line.RecognitionScore, line.EmittedCount);
                 if (!PassesConfidence(confidence)) continue;
                 var box = line.Box;
+                var quad = new Quad(new(box.X1, box.Y1), new(box.X2, box.Y2), new(box.X3, box.Y3), new(box.X4, box.Y4));
                 lines.Add(new OcrLine(
                     line.Text,
-                    new Quad(new(box.X1, box.Y1), new(box.X2, box.Y2), new(box.X3, box.Y3), new(box.X4, box.Y4)),
+                    quad,
                     confidence,
                     Language: null,
-                    Words: []));
+                    Words: [],
+                    ReadingAngleDegrees: QuadReadingAxis.Degrees(quad, line.AppliedRotationDegrees)));
             }
             return lines.ToImmutable();
         }
@@ -221,14 +223,16 @@ public sealed class SimdPaddleOcrFactory : IOcrReaderFactory
             double? confidence = MapConfidence(result.Score, (uint)result.EmittedCount);
             if (string.IsNullOrWhiteSpace(result.Text) || !PassesConfidence(confidence))
                 return [];
+            var quad = new Quad(new(0, 0), new(width, 0), new(width, height), new(0, height));
             return
             [
                 new OcrLine(
                     result.Text,
-                    new Quad(new(0, 0), new(width, 0), new(width, height), new(0, height)),
+                    quad,
                     confidence,
                     Language: null,
-                    Words: [])
+                    Words: [],
+                    ReadingAngleDegrees: QuadReadingAxis.Degrees(quad))
             ];
         }
 

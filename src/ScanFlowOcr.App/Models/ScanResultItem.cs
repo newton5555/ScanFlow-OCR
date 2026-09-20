@@ -11,6 +11,7 @@ public sealed class ScanResultItem
     public string Confidence { get; init; } = "-";
     public Guid EventId { get; init; }
     public Quad Bounds { get; init; }
+    public double ReadingAngleDegrees { get; init; }
     public string SourceId { get; init; } = "";
 
     public string ConfidenceDisplay =>
@@ -18,7 +19,7 @@ public sealed class ScanResultItem
 
     public string BoundsSummary =>
         string.Create(CultureInfo.InvariantCulture,
-            $"[({Bounds.P0.X:F0},{Bounds.P0.Y:F0})…({Bounds.P2.X:F0},{Bounds.P2.Y:F0})]");
+            $"[({Bounds.P0.X:F0},{Bounds.P0.Y:F0})→({Bounds.P2.X:F0},{Bounds.P2.Y:F0})] {ReadingAngleDegrees:F0}°");
 
     public string SearchBlob => $"{Text} {Confidence} {Time} {EventId:N} {SourceId}";
 }

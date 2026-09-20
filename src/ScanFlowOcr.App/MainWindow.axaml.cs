@@ -1444,6 +1444,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 Confidence = conf,
                 EventId = record.EventId,
                 Bounds = line.Bounds,
+                ReadingAngleDegrees = line.ReadingAngleDegrees,
                 SourceId = record.Frame.SourceId
             });
         }
@@ -1807,7 +1808,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                     new Point2(line.Bounds.P1.X + offsetX, line.Bounds.P1.Y + offsetY),
                     new Point2(line.Bounds.P2.X + offsetX, line.Bounds.P2.Y + offsetY),
                     new Point2(line.Bounds.P3.X + offsetX, line.Bounds.P3.Y + offsetY));
-                mapped.Add(new OcrLine(line.Text, q, line.Confidence, line.Language, line.Words));
+                mapped.Add(line with { Bounds = q });
             }
             items = mapped.MoveToImmutable();
         }
@@ -2339,6 +2340,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 }
 
                 OverlayCanvas.Children.Add(poly);
+                DrawReadingAxisArrow(item.Bounds, item.ReadingAngleDegrees, offsetX, offsetY, scale, isHovered);
             }
         }
 
@@ -2366,6 +2368,78 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
     }
 
+    private void DrawReadingAxisArrow(Quad bounds, double angleDegrees, double offsetX, double offsetY, double scale, bool emphasized)
+    {
+        var center = QuadReadingAxis.Center(bounds);
+        double cx = offsetX + center.X * scale;
+        double cy = offsetY + center.Y * scale;
+        double rad = angleDegrees * (Math.PI / 180.0);
+        // Arrow length ~35% of the longer quad edge (clamped), so it stays inside typical boxes.
+        double dx01 = bounds.P1.X - bounds.P0.X, dy01 = bounds.P1.Y - bounds.P0.Y;
+        double dx12 = bounds.P2.X - bounds.P1.X, dy12 = bounds.P2.Y - bounds.P1.Y;
+        double e01 = Math.Sqrt(dx01 * dx01 + dy01 * dy01);
+        double e12 = Math.Sqrt(dx12 * dx12 + dy12 * dy12);
+        double edge = Math.Max(e01, e12) * scale;
+        double len = Math.Clamp(edge * 0.35, 14.0, 48.0);
+        double tipX = cx + Math.Cos(rad) * len;
+        double tipY = cy + Math.Sin(rad) * len;
+        var stroke = emphasized
+            ? ResolveBrush("SymbologyBadgeOcrTextBrush", Brushes.Orange)
+            : ResolveBrush("BrandBrush", Brushes.Orange);
+        double thickness = emphasized ? 2.4 : 1.6;
+        double opacity = emphasized ? 1.0 : 0.85;
+
+        var shaft = new Line
+        {
+            StartPoint = new Point(cx, cy),
+            EndPoint = new Point(tipX, tipY),
+            Stroke = stroke,
+            StrokeThickness = thickness,
+            Opacity = opacity,
+            IsHitTestVisible = false
+        };
+        OverlayCanvas.Children.Add(shaft);
+
+        // Arrowhead: two short wings ~28° from the shaft.
+        const double headLen = 8.0;
+        const double headAngle = 28.0 * (Math.PI / 180.0);
+        double back = rad + Math.PI;
+        double leftX = tipX + Math.Cos(back + headAngle) * headLen;
+        double leftY = tipY + Math.Sin(back + headAngle) * headLen;
+        double rightX = tipX + Math.Cos(back - headAngle) * headLen;
+        double rightY = tipY + Math.Sin(back - headAngle) * headLen;
+        OverlayCanvas.Children.Add(new Line
+        {
+            StartPoint = new Point(tipX, tipY),
+            EndPoint = new Point(leftX, leftY),
+            Stroke = stroke,
+            StrokeThickness = thickness,
+            Opacity = opacity,
+            IsHitTestVisible = false
+        });
+        OverlayCanvas.Children.Add(new Line
+        {
+            StartPoint = new Point(tipX, tipY),
+            EndPoint = new Point(rightX, rightY),
+            Stroke = stroke,
+            StrokeThickness = thickness,
+            Opacity = opacity,
+            IsHitTestVisible = false
+        });
+
+        double r = emphasized ? 4.0 : 3.0;
+        var dot = new Ellipse
+        {
+            Width = r * 2,
+            Height = r * 2,
+            Fill = stroke,
+            Opacity = opacity,
+            IsHitTestVisible = false
+        };
+        Canvas.SetLeft(dot, cx - r);
+        Canvas.SetTop(dot, cy - r);
+        OverlayCanvas.Children.Add(dot);
+    }
     private void DrawPreviewGuides(double offsetX, double offsetY, double displayW, double displayH)
     {
         var brush = ResolveBrush("ReticleAccentBrush", Brushes.DeepSkyBlue);

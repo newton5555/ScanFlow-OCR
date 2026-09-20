@@ -28,7 +28,8 @@ public sealed record EngineBatch<T>(
 public sealed record OcrWord(string Text, Quad Bounds, double? Confidence);
 public sealed record OcrLine(
     string Text, Quad Bounds, double? Confidence, string? Language,
-    ImmutableArray<OcrWord> Words);
+    ImmutableArray<OcrWord> Words,
+    double ReadingAngleDegrees = 0);
 
 // Common parameters are typed. Vendor options are validated once during creation.
 // JsonElement must be cloned/owned independently of a disposed JsonDocument.
