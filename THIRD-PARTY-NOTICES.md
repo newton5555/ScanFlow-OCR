@@ -13,6 +13,7 @@ Copyright (c) Kouji Matsui (@kekyo) and contributors.
 
 - Sdcb.SimdPaddleOCR
 - Sdcb.SimdPaddleOCR.Models.ChineseV6Tiny / ChineseV6Small
+- Sdcb.SimdPaddleOCR.Models.TextLineOrientation
 Upstream PP-OCR / Paddle model notices must be retained when redistributing models.
 
 ## StbImageSharp / StbImageWriteSharp

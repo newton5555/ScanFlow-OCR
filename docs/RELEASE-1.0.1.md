@@ -4,7 +4,7 @@
 > 支持平台：Windows x64 / Linux x64（Ubuntu 22.04+ / Debian 12+ 等 glibc 发行版）  
 > 运行时：.NET 10.0（自包含单文件；目标机无需预装 .NET）
 
-ScanFlow-OCR v1.0.1 是 **1.0.0 之后的修正版**，重点对齐 OCR 阅读方向可视化与引擎真实朝向，便于对照 CLS / 裁剪链路问题。
+ScanFlow-OCR v1.0.1 是 **1.0.0 之后的修正版**，重点让 OCR 阅读方向可视化复现当前裁剪/旋转/CLS 路径，便于对照 CLS 与裁剪链路问题。
 
 ---
 
@@ -12,7 +12,7 @@ ScanFlow-OCR v1.0.1 是 **1.0.0 之后的修正版**，重点对齐 OCR 阅读�
 
 ### 阅读方向箭头对齐引擎
 - 图上「中心点 + 方向箭头」按 `Sdcb.SimdPaddleOCR` 裁剪语义计算：透视拉正 → 竖排（高宽比 ≥ 1.5）顺时针转正 → CLS `AppliedRotationDegrees`（0/180）
-- 箭头与送入识别器的朝向一致：识别对则箭头对；CLS 翻错时箭头也会反，便于对照排查
+- 箭头跟随送入识别器的朝向选择：当 CLS 判断错误时箭头也会跟随该错误；因此它是算法路径调试信息，不是独立的方向真值
 - 对外透出 `OcrLine.ReadingAngleDegrees`；结果详情 Bounds 旁显示角度
 
 ### 继承 1.0.0
@@ -39,7 +39,7 @@ ScanFlow-OCR v1.0.1 是 **1.0.0 之后的修正版**，重点对齐 OCR 阅读�
 | `ScanFlowOcr-linux-x64.tar.gz` | Linux x86_64（glibc 2.31+） | `ScanFlowOcr.App`、`native/linux-x64/libturbojpeg.so`、`run.sh` / `setup-permissions.sh` | `bash ./run.sh` |
 
 **Linux 键盘权限提示：**  
-确保对 `/dev/uinput` 可写（加入 `input` 组并重新登录，或临时 `sudo chmod 666 /dev/uinput`）。键盘输出写入**当前焦点窗口**，不会按进程名切焦点。
+确保对 `/dev/uinput` 可写（加入 `input` 组并重新登录，或按发行版配置 udev 规则）。临时 `chmod 666` 仅用于诊断。键盘输出写入**当前焦点窗口**，不会按进程名切焦点。
 
 ---
 
