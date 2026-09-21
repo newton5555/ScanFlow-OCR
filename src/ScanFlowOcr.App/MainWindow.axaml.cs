@@ -82,6 +82,10 @@ public partial class MainWindow : Window, IAsyncDisposable
     private bool _isDraggingViewport;
     // Set only from bottom-right toast hover; drives toast style + image box fill (location cue).
     private object? _hoveredAnnotation;
+    // Smoothed OCR engine time and end-to-end frame latency, in milliseconds.
+    private double _engineMsEma, _pipelineMsEma;
+    // Engine time of the analysis that the next accepted record belongs to.
+    private double? _pendingEngineMs;
 
     public MainWindow() : this(
         App.Services?.GetService(typeof(ISettingsManager)) as ISettingsManager ?? new SettingsManager(),
@@ -203,7 +207,10 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             var snap = _activeSession.GetSnapshot();
             double fps = UpdateMetricRate("session", snap.FramesProcessed);
-            TxtSessionMetrics.Text = $"帧 {snap.FramesReceived} · {fps:0.0} FPS / 处理 {snap.FramesProcessed}";
+            string timing = _engineMsEma > 0
+                ? $" · OCR {_engineMsEma:0} ms · 端到端 {_pipelineMsEma:0} ms"
+                : "";
+            TxtSessionMetrics.Text = $"帧 {snap.FramesReceived} · {fps:0.0} FPS / 处理 {snap.FramesProcessed}{timing}";
             TxtPreviewMetrics.Text = _sourceWidth > 0
                 ? $"{_sourceWidth}×{_sourceHeight} · {fps:0.0} FPS"
                 : "会话预览中";
@@ -215,6 +222,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 TxtHudSeparator.IsVisible = true;
                 TxtHudTitle.Text = "实时画面";
                 DotHudLive.Fill = ResolveBrush("SuccessBrush", Brushes.LimeGreen);
+                SetHudEngineTime(_engineMsEma);
             }
             return;
         }
@@ -235,6 +243,7 @@ public partial class MainWindow : Window, IAsyncDisposable
                 TxtHudSeparator.IsVisible = true;
                 TxtHudTitle.Text = "实时画面";
                 DotHudLive.Fill = ResolveBrush("SuccessBrush", Brushes.LimeGreen);
+                SetHudEngineTime(0);
             }
             return;
         }
@@ -249,6 +258,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         {
             TxtFpsHud.IsVisible = false;
             TxtHudSeparator.IsVisible = false;
+            SetHudEngineTime(0);
             if (PreviewImage.Source is not null)
             {
                 TxtHudTitle.Text = "图像预览";
@@ -287,6 +297,40 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
         return _metricFps;
     }
+
+    // EngineTime is the pure OCR inference span measured inside the reader.
+    // CompletedTimestamp - ReceivedTimestamp also covers JPEG decode, ROI copy,
+    // coordinate mapping and any queue wait, so it is the frame's real latency.
+    private void UpdateTimingMetrics(ScanAnalysis analysis)
+    {
+        double engineMs = analysis.Ocr.EngineTime.TotalMilliseconds;
+        double pipelineMs = (analysis.CompletedTimestamp - analysis.Frame.ReceivedTimestamp)
+            * 1000.0 / Stopwatch.Frequency;
+        _pipelineMsEma = ExponentialAverage(_pipelineMsEma, pipelineMs);
+        // A zero span means the reader never entered inference (cancel or deadline
+        // already passed on entry), so it must not drag the average down or label a record.
+        _pendingEngineMs = engineMs > 0 ? engineMs : null;
+        if (engineMs > 0)
+            _engineMsEma = ExponentialAverage(_engineMsEma, engineMs);
+    }
+
+    private void ResetTimingMetrics()
+    {
+        _engineMsEma = 0;
+        _pipelineMsEma = 0;
+        _pendingEngineMs = null;
+        SetHudEngineTime(0);
+    }
+
+    private void SetHudEngineTime(double engineMs)
+    {
+        if (TxtOcrMsHud is null) return;
+        TxtOcrMsHud.Text = engineMs > 0 ? $" · OCR {engineMs:0} ms" : "";
+        TxtOcrMsHud.IsVisible = engineMs > 0;
+    }
+
+    private static double ExponentialAverage(double previous, double sample) =>
+        previous <= 0 ? sample : (previous * 0.7) + (sample * 0.3);
 
     private void MainWindow_Closing(object? sender, WindowClosingEventArgs e)
     {
@@ -1390,12 +1434,16 @@ public partial class MainWindow : Window, IAsyncDisposable
                 _frameLines = analysisReady.Analysis.Ocr.Status == StageStatus.Completed
                     ? analysisReady.Analysis.Ocr.Items
                     : [];
+                UpdateTimingMetrics(analysisReady.Analysis);
                 SyncFrameAnnotations();
                 break;
             case ScanRecordReady ready:
                 AddRecord(ready.Record);
                 break;
             case StateChanged state:
+                if (state.State is SessionState.Starting or SessionState.Stopped
+                    or SessionState.Faulted or SessionState.Disposed)
+                    ResetTimingMetrics();
                 SetStatus(state.State switch
                 {
                     SessionState.Created => "已创建",
@@ -1431,6 +1479,8 @@ public partial class MainWindow : Window, IAsyncDisposable
         _lastStamp = record.Frame;
         SendOutputButton.IsEnabled = !record.TextLines.IsDefaultOrEmpty;
         string time = DateTimeOffset.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        double? engineMs = _pendingEngineMs;
+        _pendingEngineMs = null;
         for (int index = 0; index < record.TextLines.Length; index++)
         {
             var line = record.TextLines[index];
@@ -1448,7 +1498,8 @@ public partial class MainWindow : Window, IAsyncDisposable
                 ReadingAngleDegrees = line.ReadingAngleDegrees,
                 SourceId = record.Frame.SourceId,
                 AccentBrush = AnnotationPalette.Stroke(index),
-                AccentTintBrush = AnnotationPalette.Tint(index)
+                AccentTintBrush = AnnotationPalette.Tint(index),
+                EngineMs = engineMs
             });
         }
         ClearResultsButton.IsEnabled = _allResults.Count > 0;
@@ -1491,6 +1542,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         TxtInspectorBounds.Text = item.BoundsSummary;
         TxtInspectorSource.Text = item.SourceId;
         TxtInspectorEventId.Text = item.EventId.ToString("N");
+        TxtInspectorEngineMs.Text = item.EngineDisplay;
     }
 
     private void ClearInspectorMetadata()
@@ -1501,6 +1553,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         TxtInspectorBounds.Text = "";
         TxtInspectorSource.Text = "";
         TxtInspectorEventId.Text = "";
+        TxtInspectorEngineMs.Text = "";
     }
 
     private async void OnCopySelectedResult(object? sender, RoutedEventArgs e)
@@ -1827,6 +1880,7 @@ public partial class MainWindow : Window, IAsyncDisposable
         }
         var record = new ScanRecord(Guid.NewGuid(), new AnalysisId(stamp.Id, 1), stamp, DateTimeOffset.UtcNow,
             items, ImmutableDictionary<string, string>.Empty);
+        _pendingEngineMs = batch.EngineTime > TimeSpan.Zero ? batch.EngineTime.TotalMilliseconds : null;
         AddRecord(record);
         SetPipelineStatus(_preview is not null ? "预览中" : "待扫描", active: _preview is not null);
         SetStatus($"OCR {batch.Status} · {items.Length} 行 · {batch.EngineTime.TotalMilliseconds:0} ms");

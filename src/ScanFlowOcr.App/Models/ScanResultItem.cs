@@ -21,6 +21,15 @@ public sealed class ScanResultItem
     /// <summary>Translucent variant of <see cref="AccentBrush"/> for chips and row bars.</summary>
     public IBrush AccentTintBrush { get; init; } = Brushes.Transparent;
 
+    /// <summary>
+    /// OCR engine inference time for the frame this line came from, in milliseconds.
+    /// Every line accepted from one frame shares the same value: it is the cost of
+    /// the whole frame's inference, not of this single line.
+    /// </summary>
+    public double? EngineMs { get; init; }
+
+    public string EngineDisplay => EngineMs is double ms ? $"{ms:0} ms" : "-";
+
     public string ConfidenceDisplay =>
         Confidence is "-" or "" ? "" : $"得分: {Confidence}";
 

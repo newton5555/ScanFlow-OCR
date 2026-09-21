@@ -276,6 +276,9 @@
                 <TextBlock x:Name="TxtHudSeparator" Text=" · " FontSize="11" Classes="muted" VerticalAlignment="Center" />
                 <TextBlock x:Name="TxtFpsHud" Text="0.0 FPS" FontSize="11" Classes="muted"
                            FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center" />
+                <TextBlock x:Name="TxtOcrMsHud" Text="" FontSize="11" Classes="muted"
+                           FontFamily="Cascadia Code, Consolas, monospace" VerticalAlignment="Center"
+                           ToolTip.Tip="OCR 引擎实际推理耗时（指数平滑，不含解码）" />
               </StackPanel>
             </Border>
 
@@ -564,7 +567,7 @@
                   </ScrollViewer>
                 </Border>
                 <Grid x:Name="InspectorMetadataPanel" ColumnDefinitions="Auto,*,Auto,*"
-                      RowDefinitions="Auto,Auto,Auto" ColumnSpacing="7" RowSpacing="2" IsVisible="False">
+                      RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="7" RowSpacing="2" IsVisible="False">
                   <TextBlock Classes="inspector-label" Text="时间" />
                   <TextBlock x:Name="TxtInspectorTime" Grid.Column="1" Classes="inspector-value-text" />
                   <TextBlock Grid.Column="2" Classes="inspector-label" Text="置信度" />
@@ -579,6 +582,10 @@
 
                   <TextBlock Grid.Row="2" Classes="inspector-label" Text="事件" />
                   <TextBlock x:Name="TxtInspectorEventId" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
+                             Classes="inspector-value-text" TextTrimming="CharacterEllipsis" />
+
+                  <TextBlock Grid.Row="3" Classes="inspector-label" Text="本帧算法耗时" />
+                  <TextBlock x:Name="TxtInspectorEngineMs" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3"
                              Classes="inspector-value-text" TextTrimming="CharacterEllipsis" />
                 </Grid>
               </StackPanel>

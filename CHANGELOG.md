@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **OCR 框逐框配色**：同一帧内每个 OCR 框按索引取不同强调色（`AnnotationPalette`，8 色循环，不含红色），浮动气泡与右侧结果列表行使用同一颜色，便于对照定位；结果行新增左侧色条与同色「OCR」标签。
+- **帧耗时可视化**：连续扫描时 HUD 与底部指标栏显示 **OCR 引擎实际推理耗时**（指数平滑）与**端到端帧延迟**；结果详情新增「本帧算法耗时」。引擎耗时取自 `StageAnalysis.EngineTime`（只含推理，不含 JPEG 解码与 ROI 拷贝），端到端取自 `ScanAnalysis.CompletedTimestamp - FrameStamp.ReceivedTimestamp`（含解码、ROI 拷贝、坐标映射与排队等待）。同一帧的所有结果行共享该帧的引擎耗时。
 
 ## [1.0.1] - 2026-09-20
 
