@@ -4,7 +4,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Sdcb.SimdPaddleOCR" Version="1.4.1" />
+    <PackageVersion Include="Sdcb.SimdPaddleOCR" Version="1.4.2" />
     <PackageVersion Include="Sdcb.SimdPaddleOCR.ModelProvider" Version="1.0.0" />
     <PackageVersion Include="Sdcb.SimdPaddleOCR.Models.ChineseV6Tiny" Version="1.0.0" />
     <PackageVersion Include="Sdcb.SimdPaddleOCR.Models.ChineseV6Small" Version="1.0.0" />
