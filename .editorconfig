@@ -1,0 +1,26 @@
+# EditorConfig is the source of truth for encoding and whitespace in this repo.
+# Line endings are LF everywhere; .gitattributes enforces the same rule for git.
+# https://editorconfig.org
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markup, project and data files use two-space indentation.
+[*.{axaml,json,csproj,props,targets,pubxml,manifest,slnx,yml,yaml,xml,config}]
+indent_size = 2
+
+# Markdown keeps trailing whitespace: two trailing spaces are a hard line break,
+# and the release notes rely on them.
+[*.{md,markdown}]
+indent_size = 2
+trim_trailing_whitespace = false
+
+# Shell entry points ship inside the Linux packages.
+[*.{sh,ps1}]
+indent_size = 4

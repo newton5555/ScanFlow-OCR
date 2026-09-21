@@ -1,0 +1,20 @@
+# Normalize line endings for everyone, regardless of core.autocrlf.
+# Text lives in the repository as LF and is checked out as LF.
+* text=auto eol=lf
+
+# Native binaries and other non-text assets must never be converted or diffed.
+*.dll    binary
+*.so     binary
+*.dylib  binary
+*.pdb    binary
+*.exe    binary
+*.a      binary
+*.lib    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.ico    binary
+*.zip    binary
+*.gz     binary
+*.ttf    binary
+*.otf    binary
