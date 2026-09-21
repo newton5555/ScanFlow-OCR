@@ -101,7 +101,7 @@ flowchart TD
     subgraph OutputLayer["持久化与输出层 (ScanFlowOcr.Outputs)"]
         DEDUP --> OUTQ["OutputCoordinator\n(SQLite outputs.db 持久队列)"]
         OUTQ -->|Win32 SendInput / Linux uinput| KB["虚拟键盘 (前台焦点输入)"]
-        OUTQ -->|MQTTnet (QoS 0/1/2)| MQTT["MQTT Broker"]
+        OUTQ -->|MQTT QoS 0/1/2| MQTT["MQTT Broker"]
         OUTQ -->|Raw TCP Sockets| TCP["工控 MES/PLC TCP 接收端"]
     end
 
