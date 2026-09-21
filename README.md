@@ -66,52 +66,9 @@
 
 ScanFlow-OCR 按分层和单向数据流组织，各模块通过不可变事件（Records）与通道（Channels）进行异步交互：
 
-```mermaid
-flowchart TD
-    subgraph CaptureLayer["图像输入层"]
-        CAM["USB 相机\n(FlashCap)"] -->|当前后端支持的压缩/像素帧| RC["IFrameReceiver\n(ScanSession)"]
-        IMG["静态图片文件\n(PNG / JPG / BMP / TIFF)"] -->|文件流| SI["StillImageReader\n(Stb / LibTiff)"]
-    end
+![ScanFlow-OCR 系统架构与数据流](docs/scanflow-architecture.svg)
 
-    subgraph MemoryMgmt["内存池治理层"]
-        AL["ImageAllocator\n(非托管连续内存)"] <-->|Size-Class 2^N 申请/回收| LEASE["ImageLease\n(引用计数/切片/共享像素)"]
-        TRIM["MaybeTrimIdle\n(周期闲置释放/128MB分配器预算)"] -.-> AL
-    end
-
-    subgraph PipelineLayer["调度与处理管道 (ScanFlowOcr.Runtime)"]
-        RC -->|有界待处理帧| DCH["Bounded Channel (Capacity=1)"]
-        DCH --> DEC["TurboJPEG 原生 SIMD 解码\n(全分辨率原图 / 预览分流)"]
-        LEASE -.-> DEC
-        DEC --> ROI["ROI 动态区域裁剪与坐标映射"]
-        ROI --> OCR["OCR 推理引擎\n(IOcrReader)"]
-        SI --> OCR
-    end
-
-    subgraph OcrLayer["本地 OCR 推理层 (ScanFlowOcr.Ocr.SimdPaddle)"]
-        OCR --> DET["文本行位置检测 (DBNet)"]
-        DET --> CLS["文本行朝向分类 (CLS / 0° 或 180°)"]
-        CLS --> REC["字符序列识别 (CRNN / SVTR)"]
-        REC --> AXIS["ReadingAxisDegrees\n(朝向角度几何解算)"]
-    end
-
-    subgraph DedupeLayer["会话与防抖层"]
-        AXIS --> DEDUP["DedupeCoordinator\n(Session 会话去重 / Cooldown 冷却时间)"]
-    end
-
-    subgraph OutputLayer["持久化与输出层 (ScanFlowOcr.Outputs)"]
-        DEDUP --> OUTQ["OutputCoordinator\n(SQLite outputs.db 持久队列)"]
-        OUTQ -->|Win32 SendInput / Linux uinput| KB["虚拟键盘 (前台焦点输入)"]
-        OUTQ -->|MQTT QoS 0/1/2| MQTT["MQTT Broker"]
-        OUTQ -->|Raw TCP Sockets| TCP["工控 MES/PLC TCP 接收端"]
-    end
-
-    subgraph UiLayer["用户呈现层 (ScanFlowOcr.App)"]
-        DEC -->|Preview Frame| UI_PREV["Avalonia 实时视频预览"]
-        AXIS -->|Quad + ReadingAngle| UI_BOX["8 色高亮框 + 红色朝向箭头"]
-        REC -->|OcrResult| UI_LIST["右侧结果卡片列表"]
-        RC & OCR -->|EngineTime + AnalysisLatency| UI_HUD["HUD 性能指标监视器"]
-    end
-```
+图按职责自上而下分为输入与采集、图像准备、OCR 运行时、呈现与输出四条泳道；箭头上的 `Record` / `Channel` 标注表示异步数据交接，虚线表示 UI 旁路，底部再分发到键盘、MQTT 和 TCP。SVG 来源规格见 [`docs/scanflow-architecture.architecture.json`](docs/scanflow-architecture.architecture.json)。
 
 ---
 

@@ -1,0 +1,271 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "ScanFlow-OCR · 分层泳道数据流",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1380, 1040],
+    "repository": {
+      "url": "https://github.com/newton5555/ScanFlow-OCR",
+      "revision": "a6a9410f37d72e9d300ad8f7a3a6fb84eb8cca77"
+    }
+  },
+  "components": [
+    {
+      "id": "input-source",
+      "type": "external",
+      "label": "输入源",
+      "sublabel": "相机 / 本地图像",
+      "tag": "INPUT",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Capture.FlashCap/FlashCapProvider.cs", "label": "采集入口" }
+      ],
+      "pos": [45, 125],
+      "size": [160, 76]
+    },
+    {
+      "id": "capture-provider",
+      "type": "backend",
+      "label": "Capture",
+      "sublabel": "MF / V4L2 / FlashCap",
+      "tag": "CAPTURE",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Capture.FlashCap/FlashCapProvider.cs", "label": "设备格式与帧读取" }
+      ],
+      "pos": [235, 125],
+      "size": [175, 76]
+    },
+    {
+      "id": "image-prep",
+      "type": "backend",
+      "label": "ImageLease",
+      "sublabel": "非托管 BGR 缓冲 / ROI 视图",
+      "tag": "IMAGE",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Imaging/ImageLease.cs", "label": "帧生命周期与像素视图" }
+      ],
+      "pos": [235, 325],
+      "size": [185, 76]
+    },
+    {
+      "id": "scan-session",
+      "type": "backend",
+      "label": "ScanSession",
+      "sublabel": "有界 Channel / 解码 / ROI",
+      "tag": "RUNTIME",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Runtime/ScanSession.cs", "label": "扫描会话编排" }
+      ],
+      "pos": [400, 520],
+      "size": [175, 76]
+    },
+    {
+      "id": "ocr-engine",
+      "type": "backend",
+      "label": "SimdPaddleOCR",
+      "sublabel": "DBNet → CLS → 识别",
+      "tag": "OCR",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Ocr.SimdPaddle/SimdPaddleOcrFactory.cs", "label": "OCR 工厂与模型" }
+      ],
+      "pos": [600, 520],
+      "size": [175, 76]
+    },
+    {
+      "id": "dedupe-policy",
+      "type": "backend",
+      "label": "会话去重",
+      "sublabel": "Session / Cooldown",
+      "tag": "DEDUP",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Outputs/OutputCoordinator.cs", "label": "结果协调与抑制" }
+      ],
+      "pos": [800, 520],
+      "size": [175, 76]
+    },
+    {
+      "id": "preview-ui",
+      "type": "frontend",
+      "label": "Avalonia UI",
+      "sublabel": "预览 / ROI / 结果 / 朝向箭头",
+      "tag": "PRESENT",
+      "sources": [
+        { "path": "src/ScanFlowOcr.App/MainWindow.axaml.cs", "label": "主窗口与视觉呈现" }
+      ],
+      "pos": [45, 750],
+      "size": [215, 86]
+    },
+    {
+      "id": "output-queue",
+      "type": "database",
+      "label": "SQLite 输出队列",
+      "sublabel": "outputs.db / 重试记录",
+      "tag": "QUEUE",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Outputs/OutputCoordinator.cs", "label": "持久化输出队列" }
+      ],
+      "pos": [1030, 750],
+      "size": [185, 76]
+    },
+    {
+      "id": "keyboard-output",
+      "type": "external",
+      "label": "虚拟键盘",
+      "sublabel": "SendInput / uinput",
+      "tag": "OUTPUT",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Outputs/KeyboardRouting.cs", "label": "键盘输出路由" }
+      ],
+      "pos": [820, 890],
+      "size": [155, 76]
+    },
+    {
+      "id": "mqtt-output",
+      "type": "messagebus",
+      "label": "MQTT Broker",
+      "sublabel": "QoS 0 / 1 / 2 · 可选 TLS",
+      "tag": "OUTPUT",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Outputs/MqttOutputSink.cs", "label": "MQTT 输出适配器" }
+      ],
+      "pos": [1000, 890],
+      "size": [155, 76]
+    },
+    {
+      "id": "tcp-output",
+      "type": "external",
+      "label": "TCP 接收端",
+      "sublabel": "Raw TCP / JSON Lines",
+      "tag": "OUTPUT",
+      "sources": [
+        { "path": "src/ScanFlowOcr.Outputs/TcpOutputSink.cs", "label": "TCP 输出适配器" }
+      ],
+      "pos": [1180, 890],
+      "size": [155, 76]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "泳道 01 · 输入与采集",
+      "wraps": ["input-source", "capture-provider"],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "泳道 02 · 图像准备",
+      "wraps": ["image-prep"],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "泳道 03 · OCR 运行时",
+      "wraps": ["scan-session", "ocr-engine", "dedupe-policy"],
+      "pad": 28
+    },
+    {
+      "kind": "region",
+      "label": "泳道 04 · 呈现与输出",
+      "wraps": ["preview-ui", "output-queue", "keyboard-output", "mqtt-output", "tcp-output"],
+      "pad": 28
+    }
+  ],
+  "connections": [
+    {
+      "id": "source-to-capture",
+      "from": "input-source",
+      "to": "capture-provider",
+      "label": "原始帧",
+      "labelDy": -32,
+      "variant": "emphasis"
+    },
+    {
+      "id": "capture-to-image",
+      "from": "capture-provider",
+      "to": "image-prep",
+      "label": "FrameRecord · Channel",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "variant": "emphasis"
+    },
+    {
+      "id": "image-to-session",
+      "from": "image-prep",
+      "to": "scan-session",
+      "label": "ImageLease · Channel",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "variant": "emphasis"
+    },
+    {
+      "id": "session-to-ocr",
+      "from": "scan-session",
+      "to": "ocr-engine",
+      "label": "ROI 帧",
+      "labelDy": -32,
+      "variant": "emphasis"
+    },
+    {
+      "id": "ocr-to-dedupe",
+      "from": "ocr-engine",
+      "to": "dedupe-policy",
+      "label": "OcrResultRecord",
+      "labelDy": -32,
+      "variant": "emphasis"
+    },
+    {
+      "id": "session-to-ui",
+      "from": "scan-session",
+      "to": "preview-ui",
+      "label": "PreviewFrame",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "dedupe-to-ui",
+      "from": "dedupe-policy",
+      "to": "preview-ui",
+      "label": "ResultRecord",
+      "labelDx": 80,
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "dedupe-to-queue",
+      "from": "dedupe-policy",
+      "to": "output-queue",
+      "label": "OutputRecord · Channel",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "variant": "emphasis"
+    },
+    {
+      "id": "queue-to-keyboard",
+      "from": "output-queue",
+      "to": "keyboard-output",
+      "label": "文本 + Enter",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "queue-to-mqtt",
+      "from": "output-queue",
+      "to": "mqtt-output",
+      "label": "MQTT",
+      "labelDx": 90,
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "queue-to-tcp",
+      "from": "output-queue",
+      "to": "tcp-output",
+      "label": "JSON Lines",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ]
+}
